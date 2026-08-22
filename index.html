@@ -23,6 +23,20 @@
                 }
             }
         }
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  // Tu configuración de Firebase
+  const firebaseConfig = { ... };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Hacer disponible la base de datos de manera global
+  window.db = db;
+  window.addDoc = addDoc;
+  window.collection = collection;
+</script>
     </script>
 
     <!-- FontAwesome CDN -->
