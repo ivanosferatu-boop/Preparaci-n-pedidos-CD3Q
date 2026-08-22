@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNT - Sistema de Inventario y Control de Despachos</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cnt: {
+                            blue: '#00529B',
+                            lightBlue: '#00A3E0',
+                            dark: '#0B132B',
+                            card: '#1C2541'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- SheetJS CDN for Excel import/export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Logo & Title -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 font-black text-xl text-white">
+                    CNT
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-slate-100 leading-tight flex items-center gap-2">
+                        Sistema de Control de Despachos
+                        <span class="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-semibold">v3.2</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Corporación Nacional de Telecomunicaciones</p>
+                </div>
+            </div>
+
+            <!-- Operator and System Status -->
+            <div class="flex items-center space-x-4">
+                <div id="sync-status" class="hidden sm:flex items-center text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <span id="sync-status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>
+                    <span id="sync-status-text">Sistema Listo</span>
+                </div>
+
+                <button onclick="openOperatorModal()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-200 transition">
+                    <i class="fa-solid fa-user-check text-indigo-400"></i>
+                    <span class="text-slate-400">Operario:</span>
+                    <span id="active-operator-display" class="font-semibold text-white">Sin Registrar</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- KPI Metrics Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400">Equipos Disponibles</p>
+                    <h3 id="stat-equipos" class="text-2xl font-bold font-mono text-slate-100 mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-blue-950/60 border border-blue-800/40 text-blue-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400">SIM Cards</p>
+                    <h3 id="stat-sims" class="text-2xl font-bold font-mono text-slate-100 mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-sim-card"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400">eSIMs Activas</p>
+                    <h3 id="stat-esims" class="text-2xl font-bold font-mono text-slate-100 mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-qrcode"></i>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-400">Pedidos Procesados</p>
+                    <h3 id="stat-pedidos" class="text-2xl font-bold font-mono text-emerald-400 mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-box-check"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs Bar -->
+        <nav class="flex space-x-2 border-b border-slate-800 overflow-x-auto pb-1">
+            <button id="tab-btn-workstation" onclick="switchTab('workstation')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition">
+                <i class="fa-solid fa-cash-register"></i>
+                <span>Estación de Despacho</span>
+            </button>
+            <button id="tab-btn-validator" onclick="switchTab('validator')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                <i class="fa-solid fa-magnifying-glass font-bold"></i>
+                <span>Validador de Series</span>
+            </button>
+            <button id="tab-btn-inventory" onclick="switchTab('inventory')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                <i class="fa-solid fa-boxes-stacked"></i>
+                <span>Inventario Base</span>
+            </button>
+            <button id="tab-btn-orders" onclick="switchTab('orders')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                <i class="fa-solid fa-truck-ramp-box"></i>
+                <span>Pedidos Despachados</span>
+            </button>
+            <button id="tab-btn-import" onclick="switchTab('import')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                <i class="fa-solid fa-file-import"></i>
+                <span>Carga Masiva Excel</span>
+            </button>
+            <button id="tab-btn-audit" onclick="switchTab('audit')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+                <i class="fa-solid fa-clipboard-check"></i>
+                <span>Bitácora de Control</span>
+            </button>
+        </nav>
+
+        <!-- VIEW 1: WORKSTATION / PREPARATION DESK -->
+        <section id="view-workstation" class="tab-content space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-barcode text-indigo-400"></i>
+                            Módulo de Ensamblado y Preparación de Pedidos
+                        </h2>
+                        <p class="text-xs text-slate-400">Seleccione un pedido pre-cargado o ingrese los datos manualmente para validar series y autorizar salida.</p>
+                    </div>
+                    <span id="pending-orders-count-badge" class="self-start sm:self-auto text-xs px-3 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 font-medium">
+                        0 Pedidos Pendientes
+                    </span>
+                </div>
+
+                <!-- Main Workstation Form -->
+                <form id="form-workstation" onsubmit="handleDispatchSubmit(event)" class="space-y-6">
+                    
+                    <!-- Pre-loaded Orders Dropdown -->
+                    <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <label class="block text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check text-cyan-400"></i>
+                            Seleccionar Pedido Cargado (Auto-completa Pedido, Agencia y Series múltiples):
+                        </label>
+                        <select id="ws-select-pending-order" onchange="handleSelectPendingOrder(this.value)" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500">
+                            <option value="">-- Seleccionar Pedido Cargado --</option>
+                        </select>
+                    </div>
+
+                    <!-- Primary Order Identification & Destination -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Número de Pedido *</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-hashtag absolute left-3 top-3 text-slate-600 text-xs"></i>
+                                <input type="text" id="ws-order-number" required placeholder="Ej. 4700321600" class="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Agencia de Despacho *</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-building-flag absolute left-3 top-3 text-slate-600 text-xs"></i>
+                                <input type="text" id="ws-agency" required placeholder="Ej. Agencia Quito Sur / Agencia General" class="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Series Scanning & Validation Grid -->
+                    <div class="border-t border-slate-800/80 pt-4">
+                        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-microchip text-slate-500"></i>
+                            Series y Materiales Asignados (Admite múltiples series por pedido)
+                        </h3>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Equipo / IMEI -->
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                        <i class="fa-solid fa-mobile-screen text-blue-400"></i>
+                                        Serie / IMEI Equipo(s)
+                                    </label>
+                                    <span id="badge-ws-equipo" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Sin Validar</span>
+                                </div>
+                                <input type="text" id="ws-serie-equipo" oninput="validateFieldLive('equipo')" placeholder="Escanear IMEI o series separadas por comas..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-blue-500">
+                                <p id="msg-ws-equipo" class="text-[11px] hidden"></p>
+                            </div>
+
+                            <!-- SIM Card ICCID -->
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                        <i class="fa-solid fa-sim-card text-cyan-400"></i>
+                                        ICCID SIM Card(s)
+                                    </label>
+                                    <span id="badge-ws-sim" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Sin Validar</span>
+                                </div>
+                                <input type="text" id="ws-serie-sim" oninput="validateFieldLive('sim')" placeholder="Escanear ICCID o series separadas por comas..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-cyan-500">
+                                <p id="msg-ws-sim" class="text-[11px] hidden"></p>
+                            </div>
+
+                            <!-- eSIM Serial / Pin -->
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                        <i class="fa-solid fa-qrcode text-indigo-400"></i>
+                                        Código eSIM / Voucher
+                                    </label>
+                                    <span id="badge-ws-esim" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Sin Validar</span>
+                                </div>
+                                <input type="text" id="ws-serie-esim" oninput="validateFieldLive('esim')" placeholder="Escanear código eSIM o vouchers..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                                <p id="msg-ws-esim" class="text-[11px] hidden"></p>
+                            </div>
+
+                            <!-- Material Publicitario -->
+                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                        <i class="fa-solid fa-bullhorn text-amber-400"></i>
+                                        Código Publicidad / Material
+                                    </label>
+                                    <span id="badge-ws-publicidad" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">Sin Validar</span>
+                                </div>
+                                <input type="text" id="ws-serie-publicidad" oninput="validateFieldLive('publicidad')" placeholder="Código de pack o afiche promocional..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500">
+                                <p id="msg-ws-publicidad" class="text-[11px] hidden"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logistics & Transport Details -->
+                    <div class="border-t border-slate-800/80 pt-4 space-y-4">
+                        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-truck-fast text-slate-500"></i>
+                            Datos de Pesaje y Despacho Logístico
+                        </h3>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Peso Paquete (Kg)</label>
+                                <input type="number" step="0.01" id="ws-peso" placeholder="0.00" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Guía Interna CNT</label>
+                                <input type="text" id="ws-guia-cnt" placeholder="Ej. G-CNT-9921" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Guía Courier Externa</label>
+                                <input type="text" id="ws-guia-courier" placeholder="Ej. CR-883190" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-400 mb-1">Salida de Material SAP</label>
+                                <input type="text" id="ws-salida-sap" placeholder="Ej. 80002910" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submission Action Controls -->
+                    <div class="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div class="text-xs text-slate-400">
+                            Responsable de Control: <span id="form-operator-footer" class="font-semibold text-indigo-400">Sin Registrar</span>
+                        </div>
+                        <div class="flex items-center gap-3 w-full sm:w-auto">
+                            <button type="button" onclick="resetWorkstationForm()" class="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> Limpiar Formulario
+                            </button>
+                            <button type="submit" class="flex-1 sm:flex-none px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-xs shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-box-archive"></i>
+                                <span>Registrar y Despachar Pedido</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+        </section>
+
+        <!-- VIEW 2: GLOBAL SERIES VALIDATOR -->
+        <section id="view-validator" class="tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass text-indigo-400"></i>
+                        Buscador y Validador Global de Series
+                    </h2>
+                    <p class="text-xs text-slate-400">Consulte el estado, disponibilidad y trazabilidad de cualquier IMEI, ICCID o Serie en el sistema.</p>
+                </div>
+
+                <div class="flex gap-3 max-w-xl">
+                    <input type="text" id="validator-input" placeholder="Ingrese IMEI, ICCID o Serie a consultar..." onkeyup="if(event.key==='Enter') runGlobalValidation()" class="flex-grow px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-indigo-500">
+                    <button onclick="runGlobalValidation()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-5 py-2.5 rounded-xl text-xs transition">
+                        Buscar Serie
+                    </button>
+                </div>
+
+                <div id="validator-result" class="hidden"></div>
+            </div>
+        </section>
+
+        <!-- VIEW 3: INVENTORY BASE -->
+        <section id="view-inventory" class="tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                
+                <!-- Category Sub-Bar & Actions -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+                    <div class="flex space-x-4 border-b md:border-b-0 border-slate-800 text-xs font-semibold">
+                        <button id="cat-btn-equipos" onclick="switchCategory('equipos')" class="cat-btn pb-3 border-b-2 border-indigo-500 text-indigo-400 font-bold">📱 Equipos</button>
+                        <button id="cat-btn-sim" onclick="switchCategory('sim')" class="cat-btn pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">💳 SIM Cards</button>
+                        <button id="cat-btn-esim" onclick="switchCategory('esim')" class="cat-btn pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">🌐 eSIMs</button>
+                        <button id="cat-btn-publicidad" onclick="switchCategory('publicidad')" class="cat-btn pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">📣 Publicidad</button>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <span id="cat-count-badge" class="text-xs px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 font-mono">0 Registros</span>
+                        <button onclick="openAddItemModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i> Agregar Ítem
+                        </button>
+                        <button onclick="exportInventoryToExcel()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-excel text-emerald-400"></i> Exportar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Input -->
+                <div class="max-w-xs">
+                    <input type="text" id="inventory-search" onkeyup="renderCategoryTable()" placeholder="Filtrar por serie o detalle..." class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <!-- Inventory Table -->
+                <div class="overflow-x-auto rounded-xl border border-slate-800">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Serie / Identificador</th>
+                                <th class="p-3">Categoría</th>
+                                <th class="p-3">Detalle / Modelo</th>
+                                <th class="p-3">Estado</th>
+                                <th class="p-3">Pedido Asignado</th>
+                                <th class="p-3">Fecha Carga</th>
+                                <th class="p-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="divide-y divide-slate-800/60 bg-slate-900/40">
+                            <!-- Dynamic rendering -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 4: DISPATCHED ORDERS HISTORY -->
+        <section id="view-orders" class="tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-truck-ramp-box text-indigo-400"></i>
+                            Histórico de Pedidos Despachados
+                        </h2>
+                        <p class="text-xs text-slate-400">Registro completo de salidas, agencias de destino y operarios responsables.</p>
+                    </div>
+                    <button onclick="exportOrdersToExcel()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl border border-slate-700 transition flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel text-emerald-400"></i> Exportar Despachos
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-800">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
+                            <tr>
+                                <th class="p-3"># Pedido</th>
+                                <th class="p-3">Agencia Destino</th>
+                                <th class="p-3">Guías (CNT / Courier)</th>
+                                <th class="p-3">Salida SAP</th>
+                                <th class="p-3">Peso</th>
+                                <th class="p-3">Series Vinculadas</th>
+                                <th class="p-3">Operario</th>
+                                <th class="p-3">Fecha y Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body" class="divide-y divide-slate-800/60 bg-slate-900/40">
+                            <!-- Dynamic rendering -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 5: MASSIVE IMPORT -->
+        <section id="view-import" class="tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-file-import text-indigo-400"></i>
+                        Carga Masiva desde Archivo Excel / CSV
+                    </h2>
+                    <p class="text-xs text-slate-400">Importe múltiples series de equipos, SIMs o pedidos asignados ordenados por agencia.</p>
+                </div>
+
+                <!-- Import Target Selector -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <label class="cursor-pointer">
+                        <input type="radio" name="import-target" value="equipos" checked class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-slate-800 bg-slate-950 peer-checked:border-blue-500 peer-checked:bg-blue-950/20 text-center transition">
+                            <div class="text-xs font-semibold text-slate-300">📱 Equipos</div>
+                            <div class="text-[10px] text-slate-500">Series / IMEI</div>
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="import-target" value="sim" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-slate-800 bg-slate-950 peer-checked:border-cyan-500 peer-checked:bg-cyan-950/20 text-center transition">
+                            <div class="text-xs font-semibold text-slate-300">💳 SIM Cards</div>
+                            <div class="text-[10px] text-slate-500">ICCID</div>
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="import-target" value="esim" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-slate-800 bg-slate-950 peer-checked:border-indigo-500 peer-checked:bg-indigo-950/20 text-center transition">
+                            <div class="text-xs font-semibold text-slate-300">🌐 eSIMs</div>
+                            <div class="text-[10px] text-slate-500">Códigos QR</div>
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="import-target" value="publicidad" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-slate-800 bg-slate-950 peer-checked:border-amber-500 peer-checked:bg-amber-950/20 text-center transition">
+                            <div class="text-xs font-semibold text-slate-300">📣 Publicidad</div>
+                            <div class="text-[10px] text-slate-500">Packs / Material</div>
+                        </div>
+                    </label>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="import-target" value="pedidos" class="peer sr-only">
+                        <div class="p-3 rounded-xl border border-slate-800 bg-slate-950 peer-checked:border-emerald-500 peer-checked:bg-emerald-950/20 text-center transition">
+                            <div class="text-xs font-semibold text-slate-300">📦 Pedidos</div>
+                            <div class="text-[10px] text-slate-500">Pre-carga Órdenes</div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Dropzone Area -->
+                <div class="border-2 border-dashed border-slate-700 hover:border-emerald-500/50 rounded-2xl p-8 text-center bg-slate-950/50 transition">
+                    <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-600 mb-3"></i>
+                    <p class="text-sm font-medium text-slate-300 mb-1">Arrastre su archivo Excel (.xlsx) o CSV aquí</p>
+                    <p class="text-xs text-slate-500 mb-4">
+                        Para pedidos y agencias, asegúrese de usar las columnas: 
+                        <code class="text-indigo-400">pedido</code>, <code class="text-indigo-400">agencia</code>, <code class="text-indigo-400">serie</code>, <code class="text-indigo-400">tipo</code>
+                    </p>
+                    
+                    <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                    <button onclick="document.getElementById('excel-file-input').click()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
+                        Seleccionar Archivo Local
+                    </button>
+                </div>
+
+                <div id="import-preview" class="hidden space-y-3">
+                    <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Previsualización de Carga</h4>
+                    <div id="import-preview-content" class="text-xs text-slate-400 bg-slate-950 p-4 rounded-xl max-h-40 overflow-y-auto font-mono"></div>
+                    <button onclick="confirmImport()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg">Confirmar e Importar Registros</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 6: AUDIT LOG -->
+        <section id="view-audit" class="tab-content hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-clipboard-check text-indigo-400"></i>
+                            Bitácora de Control de Calidad y Eventos
+                        </h2>
+                        <p class="text-xs text-slate-400">Auditoría en tiempo real de operaciones, desvinculaciones y despachos realizados.</p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-800">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">Marca de Tiempo</th>
+                                <th class="p-3">Operario</th>
+                                <th class="p-3">Evento / Acción</th>
+                                <th class="p-3">Detalle del Registro</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body" class="divide-y divide-slate-800/60 bg-slate-900/40">
+                            <!-- Dynamic rendering -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom Confirmation Modal -->
+    <div id="modal-confirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-950/60 border border-amber-800/40 text-amber-400 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-white">Confirmación Requerida</h3>
+                    <p id="confirm-modal-text" class="text-xs text-slate-400 mt-0.5"></p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button id="confirm-modal-cancel" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs hover:bg-slate-700">Cancelar</button>
+                <button id="confirm-modal-ok" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-500">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Operator Modal -->
+    <div id="modal-operator" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-user-gear text-indigo-400"></i> Registrar Operario de Control
+            </h3>
+            <p class="text-xs text-slate-400">Ingrese el nombre del responsable de la estación de preparación actual.</p>
+            <input type="text" id="operator-input-name" placeholder="Ej. Juan Pérez - Control Calidad" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500">
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeOperatorModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs hover:bg-slate-700">Cancelar</button>
+                <button onclick="saveOperatorName()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-500">Guardar Operario</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div id="modal-add-item" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-plus text-emerald-400"></i> Agregar Ítem al Inventario
+            </h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Categoría</label>
+                    <select id="add-item-category" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 text-xs">
+                        <option value="equipos">📱 Equipo Celular</option>
+                        <option value="sim">💳 SIM Card</option>
+                        <option value="esim">🌐 eSIM</option>
+                        <option value="publicidad">📣 Publicidad / Material</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Serie / Identificador *</label>
+                    <input type="text" id="add-item-serie" placeholder="Escanear o ingresar serie..." class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Modelo / Detalle</label>
+                    <input type="text" id="add-item-detail" placeholder="Ej. Samsung A54 128GB" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 text-xs">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeAddItemModal()" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs hover:bg-slate-700">Cancelar</button>
+                <button onclick="saveSingleItem()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-500">Guardar e Insertar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* Database and State Initialization */
+        let db = {
+            equipos: [],
+            sim: [],
+            esim: [],
+            publicidad: [],
+            orders: [],
+            pendingOrders: [],
+            audit: []
+        };
+
+        let activeOperator = localStorage.getItem('cnt_operator') || 'Sin Registrar';
+        let currentCategoryView = 'equipos';
+        let pendingImportData = null;
+
+        // Custom UI Notification Toast
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                success: 'bg-emerald-950/90 border-emerald-800 text-emerald-200',
+                error: 'bg-rose-950/90 border-rose-800 text-rose-200',
+                warning: 'bg-amber-950/90 border-amber-800 text-amber-200',
+                info: 'bg-indigo-950/90 border-indigo-800 text-indigo-200'
+            };
+
+            const icons = {
+                success: 'fa-circle-check text-emerald-400',
+                error: 'fa-circle-xmark text-rose-400',
+                warning: 'fa-triangle-exclamation text-amber-400',
+                info: 'fa-circle-info text-indigo-400'
+            };
+
+            toast.className = `p-3.5 rounded-xl border backdrop-blur-md shadow-2xl flex items-center space-x-3 text-xs transition-all transform duration-300 pointer-events-auto ${colors[type] || colors.info}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type] || icons.info} text-base"></i>
+                <span class="flex-grow font-medium">${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-x-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Custom Confirm Dialog Replacement (No native confirm())
+        function showConfirmDialog(message, onConfirm) {
+            const modal = document.getElementById('modal-confirm');
+            document.getElementById('confirm-modal-text').textContent = message;
+            modal.classList.remove('hidden');
+
+            const okBtn = document.getElementById('confirm-modal-ok');
+            const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+            const cleanUp = () => {
+                modal.classList.add('hidden');
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+            };
+
+            okBtn.onclick = () => {
+                cleanUp();
+                onConfirm();
+            };
+            cancelBtn.onclick = () => {
+                cleanUp();
+            };
+        }
+
+        /* App Initialization */
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLocalStorage();
+            updateOperatorDisplay();
+            updateStats();
+            renderPendingOrdersDropdown();
+            renderAuditLog();
+        });
+
+        /* Navigation Tab Handler */
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition";
+            });
+
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            if (activeBtn) {
+                activeBtn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition";
+            }
+
+            if (tabId === 'inventory') renderCategoryTable();
+            if (tabId === 'orders') renderOrdersTable();
+        }
+
+        /* Category Sub-Tab Handler */
+        function switchCategory(cat) {
+            currentCategoryView = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.className = "cat-btn pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
+            });
+            const activeCatBtn = document.getElementById(`cat-btn-${cat}`);
+            if (activeCatBtn) {
+                activeCatBtn.className = "cat-btn pb-3 border-b-2 border-indigo-500 text-indigo-400 font-bold";
+            }
+            renderCategoryTable();
+        }
+
+        /* Operator Management */
+        function openOperatorModal() { document.getElementById('modal-operator').classList.remove('hidden'); }
+        function closeOperatorModal() { document.getElementById('modal-operator').classList.add('hidden'); }
+        function saveOperatorName() {
+            const val = document.getElementById('operator-input-name').value.trim();
+            if (val) {
+                activeOperator = val;
+                localStorage.setItem('cnt_operator', val);
+                updateOperatorDisplay();
+                logAuditEvent('Operario Registrado', `Inició sesión de trabajo: ${val}`);
+                showToast(`Operario registrado: ${val}`, 'success');
+                closeOperatorModal();
+            }
+        }
+        function updateOperatorDisplay() {
+            document.getElementById('active-operator-display').textContent = activeOperator;
+            document.getElementById('form-operator-footer').textContent = activeOperator;
+        }
+
+        /* Live Field Validation & Checking */
+        function validateFieldLive(type) {
+            const inputVal = document.getElementById(`ws-serie-${type}`).value.trim();
+            const badge = document.getElementById(`badge-ws-${type}`);
+            const msg = document.getElementById(`msg-ws-${type}`);
+
+            if (!inputVal) {
+                badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
+                badge.textContent = "Sin Validar";
+                msg.classList.add('hidden');
+                return;
+            }
+
+            // Split in case of comma separated series
+            const seriesList = inputVal.split(',').map(s => s.trim()).filter(s => s.length > 0);
+            let notFound = [];
+            let dispatched = [];
+            let valid = [];
+
+            seriesList.forEach(s => {
+                const found = db[type].find(item => item.serie === s);
+                if (!found) {
+                    notFound.push(s);
+                } else if (found.status === 'Despachado') {
+                    dispatched.push(s);
+                } else {
+                    valid.push(s);
+                }
+            });
+
+            if (notFound.length > 0 || dispatched.length > 0) {
+                badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800/50";
+                badge.textContent = `${valid.length}/${seriesList.length} Válidas`;
+                msg.className = "text-[11px] mt-1 text-amber-400";
+                let detailMsg = [];
+                if (notFound.length) detailMsg.push(`No registradas: ${notFound.join(', ')}`);
+                if (dispatched.length) detailMsg.push(`Ya despachadas: ${dispatched.join(', ')}`);
+                msg.textContent = `⚠️ ${detailMsg.join(' | ')}`;
+                msg.classList.remove('hidden');
+            } else {
+                badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/50";
+                badge.textContent = `✅ ${valid.length} Válida(s)`;
+                msg.className = "text-[11px] mt-1 text-emerald-400";
+                msg.textContent = `✅ ${valid.length} serie(s) lista(s) para despacho`;
+                msg.classList.remove('hidden');
+            }
+        }
+
+        /* Select Pre-loaded Order and auto-populate order #, agency, and all series */
+        function handleSelectPendingOrder(idx) {
+            if (idx === "" || idx === null || idx === undefined) return;
+            
+            const selected = db.pendingOrders[idx];
+            if (!selected) return;
+
+            // 1. Assign Order number and Agency
+            document.getElementById('ws-order-number').value = selected.orderNum || '';
+            document.getElementById('ws-agency').value = selected.agency || 'Agencia Sin Especificar';
+
+            // 2. Clear current series inputs
+            ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => {
+                const input = document.getElementById(`ws-serie-${type}`);
+                if (input) input.value = '';
+            });
+
+            // 3. Populate all series associated with this order
+            if (selected.series && selected.series.length > 0) {
+                selected.series.forEach(item => {
+                    const inputId = `ws-serie-${item.tipo}`;
+                    const inputEl = document.getElementById(inputId);
+                    
+                    if (inputEl && item.serie) {
+                        if (inputEl.value) {
+                            inputEl.value += `, ${item.serie}`;
+                        } else {
+                            inputEl.value = item.serie;
+                        }
+                    }
+                });
+            }
+
+            // Trigger live validation for populated series
+            ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => validateFieldLive(type));
+            showToast(`Pedido ${selected.orderNum} cargado con ${selected.series ? selected.series.length : 0} series.`, 'info');
+        }
+
+        /* Render pending orders dropdown with multi-series count */
+        function renderPendingOrdersDropdown() {
+            const select = document.getElementById('ws-select-pending-order');
+            select.innerHTML = '<option value="">-- Seleccionar Pedido Cargado (Auto-completa Pedido y Agencia) --</option>';
+
+            db.pendingOrders.forEach((p, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                const totalSeries = p.series ? p.series.length : 0;
+                opt.textContent = `${p.orderNum} — ${p.agency} [Series asociadas: ${totalSeries}]`;
+                select.appendChild(opt);
+            });
+
+            const badge = document.getElementById('pending-orders-count-badge');
+            if (badge) badge.textContent = `${db.pendingOrders.length} Pedidos Pendientes`;
+        }
+
+        /* Dispatch Submission Handler */
+        function handleDispatchSubmit(e) {
+            e.preventDefault();
+            const orderNum = document.getElementById('ws-order-number').value.trim();
+            const agency = document.getElementById('ws-agency').value.trim();
+            const eqSerie = document.getElementById('ws-serie-equipo').value.trim();
+            const simSerie = document.getElementById('ws-serie-sim').value.trim();
+            const esimSerie = document.getElementById('ws-serie-esim').value.trim();
+            const pubSerie = document.getElementById('ws-serie-publicidad').value.trim();
+            const peso = document.getElementById('ws-peso').value.trim();
+            const guiaCnt = document.getElementById('ws-guia-cnt').value.trim();
+            const guiaCourier = document.getElementById('ws-guia-courier').value.trim();
+            const salidaSap = document.getElementById('ws-salida-sap').value.trim();
+
+            if (activeOperator === 'Sin Registrar') {
+                showToast('Por favor registre el nombre del Operario antes de despachar.', 'warning');
+                openOperatorModal();
+                return;
+            }
+
+            const orderData = {
+                orderNum, agency, peso, guiaCnt, guiaCourier, salidaSap,
+                series: { eqSerie, simSerie, esimSerie, pubSerie },
+                operator: activeOperator,
+                date: new Date().toLocaleString('es-EC')
+            };
+
+            // Mark items as used across categories
+            const categories = [
+                { type: 'equipos', input: eqSerie },
+                { type: 'sim', input: simSerie },
+                { type: 'esim', input: esimSerie },
+                { type: 'publicidad', input: pubSerie }
+            ];
+
+            categories.forEach(({ type, input }) => {
+                if (input) {
+                    const list = input.split(',').map(s => s.trim()).filter(Boolean);
+                    list.forEach(serie => {
+                        let item = db[type].find(i => i.serie === serie);
+                        if (item) {
+                            item.status = 'Despachado';
+                            item.assignedOrder = orderNum;
+                        } else {
+                            db[type].push({
+                                serie, detail: 'Registro al Despacho',
+                                status: 'Despachado', assignedOrder: orderNum, date: new Date().toLocaleDateString('es-EC')
+                            });
+                        }
+                    });
+                }
+            });
+
+            db.orders.unshift(orderData);
+            // Remove from pending orders queue
+            db.pendingOrders = db.pendingOrders.filter(p => p.orderNum !== orderNum);
+
+            saveLocalStorage();
+            updateStats();
+            renderPendingOrdersDropdown();
+            logAuditEvent('Despacho Completado', `Pedido ${orderNum} registrado para la agencia ${agency}.`);
+
+            showToast(`✅ Pedido ${orderNum} despachado exitosamente.`, 'success');
+            resetWorkstationForm();
+        }
+
+        function resetWorkstationForm() {
+            document.getElementById('form-workstation').reset();
+            ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => {
+                const badge = document.getElementById(`badge-ws-${type}`);
+                if (badge) {
+                    badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
+                    badge.textContent = "Sin Validar";
+                }
+                const msg = document.getElementById(`msg-ws-${type}`);
+                if (msg) msg.classList.add('hidden');
+            });
+        }
+
+        /* Bulk File Import Logic */
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(sheet);
+
+                    pendingImportData = json;
+                    document.getElementById('import-preview-content').textContent = JSON.stringify(json.slice(0, 5), null, 2) + `\n... y ${json.length > 5 ? json.length - 5 : 0} filas más.`;
+                    document.getElementById('import-preview').classList.remove('hidden');
+                    showToast(`Archivo cargado con ${json.length} filas para revisión.`, 'info');
+                } catch (err) {
+                    showToast('Error al leer el archivo Excel.', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        /* Confirm Import & Group Multi-series Orders */
+        function confirmImport() {
+            if (!pendingImportData) return;
+            const target = document.querySelector('input[name="import-target"]:checked').value;
+
+            if (target === 'pedidos') {
+                let countNew = 0;
+                pendingImportData.forEach(r => {
+                    const orderNum = String(r.orderNum || r.pedido || r.PEDIDO || '').trim();
+                    const agency = String(r.agency || r.agencia || r.AGENCIA || '').trim();
+                    const serie = String(r.serie || r.SERIE || r.imei || r.IMEI || r.iccid || '').trim();
+                    let tipo = String(r.tipo || r.TIPO || 'equipo').toLowerCase().trim();
+
+                    if (!['equipo', 'sim', 'esim', 'publicidad'].includes(tipo)) {
+                        tipo = 'equipo';
+                    }
+
+                    if (!orderNum) return;
+
+                    // Group by order number so multiple series are stored under the same order and agency
+                    let existingOrder = db.pendingOrders.find(p => p.orderNum === orderNum);
+
+                    if (existingOrder) {
+                        if (agency) existingOrder.agency = agency;
+                        if (serie) existingOrder.series.push({ serie, tipo });
+                    } else {
+                        db.pendingOrders.push({
+                            orderNum,
+                            agency: agency || 'Agencia Sin Especificar',
+                            series: serie ? [{ serie, tipo }] : []
+                        });
+                        countNew++;
+                    }
+                });
+                renderPendingOrdersDropdown();
+                showToast(`Se importaron/actualizaron los pedidos con sus series asociadas.`, 'success');
+            } else {
+                let imported = 0;
+                pendingImportData.forEach(r => {
+                    const serie = String(r.serie || r.SERIE || r.imei || r.IMEI || r.iccid || '').trim();
+                    const detail = r.detail || r.detalle || r.DETALLE || r.modelo || '';
+                    if (serie) {
+                        db[target].push({ serie, detail, status: 'Disponible', date: new Date().toLocaleDateString('es-EC') });
+                        imported++;
+                    }
+                });
+                showToast(`Importadas ${imported} series a la categoría ${target.toUpperCase()}.`, 'success');
+            }
+
+            saveLocalStorage();
+            updateStats();
+            logAuditEvent('Carga Masiva', `Se procesaron ${pendingImportData.length} registros en ${target}`);
+            document.getElementById('import-preview').classList.add('hidden');
+            pendingImportData = null;
+        }
+
+        /* Global Search Validator */
+        function runGlobalValidation() {
+            const query = document.getElementById('validator-input').value.trim();
+            const resultCard = document.getElementById('validator-result');
+            if (!query) return;
+
+            let match = null;
+            let catName = '';
+
+            for (let cat of ['equipos', 'sim', 'esim', 'publicidad']) {
+                let found = db[cat].find(i => i.serie === query);
+                if (found) {
+                    match = found;
+                    catName = cat.toUpperCase();
+                    break;
+                }
+            }
+
+            resultCard.classList.remove('hidden');
+            if (match) {
+                const isAvail = match.status !== 'Despachado';
+                resultCard.className = `p-6 rounded-xl border ${isAvail ? 'bg-emerald-950/20 border-emerald-800/60' : 'bg-rose-950/20 border-rose-800/60'}`;
+                resultCard.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded bg-slate-800 text-slate-300">${catName}</span>
+                            <h3 class="text-xl font-mono font-bold text-white mt-2">${match.serie}</h3>
+                            <p class="text-xs text-slate-400 mt-1">Detalle: ${match.detail || 'Sin Descripción'}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-bold ${isAvail ? 'text-emerald-400' : 'text-rose-400'}">${match.status || 'Disponible'}</span>
+                            ${match.assignedOrder ? `<p class="text-xs text-slate-400 mt-1">Pedido: <strong class="text-indigo-400">${match.assignedOrder}</strong></p>` : ''}
+                        </div>
+                    </div>
+                `;
+            } else {
+                resultCard.className = "p-6 rounded-xl border bg-slate-950 border-slate-800 text-center";
+                resultCard.innerHTML = `<p class="text-sm text-slate-400"><i class="fa-solid fa-circle-question mr-2 text-amber-400"></i>Serie no encontrada en la base de datos.</p>`;
+            }
+        }
+
+        /* Render Inventory Tables */
+        function renderCategoryTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            const filter = document.getElementById('inventory-search').value.toLowerCase();
+            tbody.innerHTML = '';
+
+            let list = db[currentCategoryView] || [];
+            if (filter) {
+                list = list.filter(i => i.serie.toLowerCase().includes(filter) || (i.detail && i.detail.toLowerCase().includes(filter)));
+            }
+
+            document.getElementById('cat-count-badge').textContent = `${list.length} Registros`;
+
+            if (list.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay registros en esta categoría.</td></tr>`;
+                return;
+            }
+
+            list.forEach((item, index) => {
+                const isAvail = item.status !== 'Despachado';
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-mono font-semibold text-slate-200">${item.serie}</td>
+                    <td class="p-3 uppercase text-[10px] text-slate-400">${currentCategoryView}</td>
+                    <td class="p-3 text-slate-300">${item.detail || 'N/A'}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${isAvail ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/50' : 'bg-rose-950 text-rose-400 border border-rose-800/50'}">
+                            ${item.status || 'Disponible'}
+                        </span>
+                    </td>
+                    <td class="p-3 font-mono text-slate-400">${item.assignedOrder || '---'}</td>
+                    <td class="p-3 text-slate-500 text-[11px]">${item.date || '---'}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="confirmDeleteInventoryItem('${currentCategoryView}', ${index})" class="text-slate-500 hover:text-rose-400 transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function confirmDeleteInventoryItem(cat, idx) {
+            showConfirmDialog('¿Está seguro de eliminar este registro del inventario?', () => {
+                const removed = db[cat].splice(idx, 1);
+                saveLocalStorage();
+                updateStats();
+                renderCategoryTable();
+                logAuditEvent('Eliminación de Registro', `Eliminada serie ${removed[0]?.serie} de ${cat}`);
+                showToast('Registro eliminado.', 'info');
+            });
+        }
+
+        /* Render Dispatched Orders Table */
+        function renderOrdersTable() {
+            const tbody = document.getElementById('orders-table-body');
+            tbody.innerHTML = '';
+
+            if (db.orders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-500">No hay pedidos despachados registrados.</td></tr>`;
+                return;
+            }
+
+            db.orders.forEach(o => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-indigo-400 font-mono">${o.orderNum}</td>
+                    <td class="p-3 text-slate-200">${o.agency}</td>
+                    <td class="p-3 font-mono text-slate-400">${o.guiaCnt || '-'} / ${o.guiaCourier || '-'}</td>
+                    <td class="p-3 font-mono text-slate-300">${o.salidaSap || '-'}</td>
+                    <td class="p-3 text-slate-300">${o.peso ? o.peso + ' Kg' : '-'}</td>
+                    <td class="p-3 text-[11px] text-slate-400 font-mono">
+                        Eq: ${o.series?.eqSerie || '-'} | SIM: ${o.series?.simSerie || '-'}
+                    </td>
+                    <td class="p-3 text-slate-300">${o.operator}</td>
+                    <td class="p-3 text-slate-500 text-[11px]">${o.date}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        /* Single Item Creation */
+        function openAddItemModal() { document.getElementById('modal-add-item').classList.remove('hidden'); }
+        function closeAddItemModal() { document.getElementById('modal-add-item').classList.add('hidden'); }
+        function saveSingleItem() {
+            const cat = document.getElementById('add-item-category').value;
+            const serie = document.getElementById('add-item-serie').value.trim();
+            const detail = document.getElementById('add-item-detail').value.trim();
+
+            if (!serie) {
+                showToast('La serie es obligatoria.', 'warning');
+                return;
+            }
+
+            db[cat].push({ serie, detail, status: 'Disponible', date: new Date().toLocaleDateString('es-EC') });
+            saveLocalStorage();
+            updateStats();
+            closeAddItemModal();
+            if (currentCategoryView === cat) renderCategoryTable();
+            logAuditEvent('Ítem Creado', `Añadida serie ${serie} a ${cat}`);
+            showToast('Ítem guardado correctamente.', 'success');
+        }
+
+        /* Stats & Persistence */
+        function updateStats() {
+            document.getElementById('stat-equipos').textContent = db.equipos.filter(i => i.status !== 'Despachado').length;
+            document.getElementById('stat-sims').textContent = db.sim.filter(i => i.status !== 'Despachado').length;
+            document.getElementById('stat-esims').textContent = db.esim.filter(i => i.status !== 'Despachado').length;
+            document.getElementById('stat-pedidos').textContent = db.orders.length;
+        }
+
+        function saveLocalStorage() { localStorage.setItem('cnt_db', JSON.stringify(db)); }
+        function loadLocalStorage() {
+            const data = localStorage.getItem('cnt_db');
+            if (data) {
+                try {
+                    db = JSON.parse(data);
+                    if (!db.pendingOrders) db.pendingOrders = [];
+                    if (!db.audit) db.audit = [];
+                } catch (e) {
+                    console.error("Error cargando almacenamiento local", e);
+                }
+            }
+        }
+
+        /* Audit Trail Log */
+        function logAuditEvent(event, detail) {
+            const entry = {
+                timestamp: new Date().toLocaleString('es-EC'),
+                operator: activeOperator,
+                event, detail
+            };
+            db.audit.unshift(entry);
+            saveLocalStorage();
+            renderAuditLog();
+        }
+
+        function renderAuditLog() {
+            const tbody = document.getElementById('audit-table-body');
+            tbody.innerHTML = '';
+            (db.audit || []).slice(0, 30).forEach(a => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-800/40 transition";
+                tr.innerHTML = `
+                    <td class="p-3 text-slate-500 font-mono text-[11px]">${a.timestamp}</td>
+                    <td class="p-3 text-indigo-300 font-medium">${a.operator}</td>
+                    <td class="p-3 text-slate-200 font-semibold">${a.event}</td>
+                    <td class="p-3 text-slate-400">${a.detail}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        /* Excel Exporters */
+        function exportInventoryToExcel() {
+            const ws = XLSX.utils.json_to_sheet(db[currentCategoryView]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, currentCategoryView.toUpperCase());
+            XLSX.writeFile(wb, `Inventario_${currentCategoryView}_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('Inventario exportado a Excel.', 'success');
+        }
+
+        function exportOrdersToExcel() {
+            const ws = XLSX.utils.json_to_sheet(db.orders);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "PEDIDOS_DESPACHADOS");
+            XLSX.writeFile(wb, `Reporte_Pedidos_CNT_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('Pedidos despachados exportados a Excel.', 'success');
+        }
+    </script>
+</body>
+</html>
