@@ -1215,6 +1215,25 @@
             XLSX.writeFile(wb, `Reporte_Pedidos_CNT_${new Date().toISOString().slice(0,10)}.xlsx`);
             showToast('Pedidos despachados exportados a Excel.', 'success');
         }
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBUYs6yfnAJ3IuDzd9u3K0F0T74dxLnl1Q",
+  authDomain: "preparacion-cd3q.firebaseapp.com",
+  projectId: "preparacion-cd3q",
+  storageBucket: "preparacion-cd3q.firebasestorage.app",
+  messagingSenderId: "669973043687",
+  appId: "1:669973043687:web:8542cd541f414c2d718542"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
     </script>
+<input type="text" id="miCampo" placeholder="Escribe un mensaje o dato...">
+<button onclick="guardarDato()">Guardar en Firebase</button>
 </body>
 </html>
