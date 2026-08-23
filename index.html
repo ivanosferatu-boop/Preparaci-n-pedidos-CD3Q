@@ -22,21 +22,81 @@
                     }
                 }
             }
+        };
+    </script>
+
+    <script type="module">
+        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, onSnapshot, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const defaultFirebaseConfig = {
+            apiKey: "AIzaSyBUYs6yfnAJ3IuDzd9u3K0F0T74dxLnl1Q",
+            authDomain: "preparacion-cd3q.firebaseapp.com",
+            projectId: "preparacion-cd3q",
+            storageBucket: "preparacion-cd3q.firebasestorage.app",
+            messagingSenderId: "669973043687",
+            appId: "1:669973043687:web:8542cd541f414c2d718542"
+        };
+
+        // Retrieve custom config or preference from LocalStorage if available.
+        // Default syncEnabled to FALSE to prevent auto-connecting to non-existent default Firestore database.
+        const savedConfig = localStorage.getItem('cnt_firebase_config');
+        const firebaseConfig = savedConfig ? JSON.parse(savedConfig) : defaultFirebaseConfig;
+        const syncEnabled = localStorage.getItem('cnt_firebase_enabled') === 'true';
+
+        window.firebaseConfig = firebaseConfig;
+        window.firebaseSyncEnabled = syncEnabled;
+
+        let dbInstance = null;
+        if (syncEnabled) {
+            try {
+                const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+                dbInstance = getFirestore(app);
+                window.firebaseDb = dbInstance;
+            } catch (error) {
+                console.warn("Inicialización de Firebase omitida:", error.message);
+                window.firebaseDb = null;
+            }
+        } else {
+            window.firebaseDb = null;
         }
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // Tu configuración de Firebase
-  const firebaseConfig = { ... };
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // Hacer disponible la base de datos de manera global
-  window.db = db;
-  window.addDoc = addDoc;
-  window.collection = collection;
-</script>
+        // Global safe bridge service for Firebase Firestore operations
+        window.firebaseServices = {
+            subscribeToState: function(onSuccess, onError) {
+                if (!dbInstance || !window.firebaseSyncEnabled) return null;
+                try {
+                    return onSnapshot(doc(dbInstance, "cnt_state", "current_db"), 
+                        (docSnap) => {
+                            if (docSnap.exists()) {
+                                onSuccess(docSnap.data());
+                            } else {
+                                onSuccess(null);
+                            }
+                        },
+                        (err) => {
+                            if (onError) onError(err);
+                        }
+                    );
+                } catch(e) {
+                    if (onError) onError(e);
+                    return null;
+                }
+            },
+            saveState: async function(data) {
+                if (!dbInstance || !window.firebaseSyncEnabled) return false;
+                try {
+                    await setDoc(doc(dbInstance, "cnt_state", "current_db"), {
+                        db: data,
+                        updatedAt: new Date().toISOString()
+                    });
+                    return true;
+                } catch(e) {
+                    console.warn("Error guardando estado en Firestore:", e.message);
+                    return false;
+                }
+            }
+        };
     </script>
 
     <!-- FontAwesome CDN -->
@@ -53,7 +113,6 @@
         .font-mono {
             font-family: 'JetBrains Mono', monospace;
         }
-        /* Custom scrollbars */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -72,10 +131,9 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
 
-    <!-- Toast Notification Overlay -->
+    <!-- Toast Notification Overlay Container -->
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
 
-    <!-- Top Navigation Header -->
     <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             
@@ -87,29 +145,29 @@
                 <div>
                     <h1 class="text-base font-bold text-slate-100 leading-tight flex items-center gap-2">
                         Sistema de Control de Despachos
-                        <span class="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-semibold">v3.2</span>
+                        <span class="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-semibold">v3.4</span>
                     </h1>
                     <p class="text-xs text-slate-400">Corporación Nacional de Telecomunicaciones</p>
                 </div>
             </div>
 
-            <!-- Operator and System Status -->
-            <div class="flex items-center space-x-4">
-                <div id="sync-status" class="hidden sm:flex items-center text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-                    <span id="sync-status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span>
-                    <span id="sync-status-text">Sistema Listo</span>
-                </div>
+            <!-- Operator & Connection Status Indicator -->
+            <div class="flex items-center space-x-3">
+                <button id="sync-status" onclick="openFirebaseHelpModal()" class="flex items-center text-xs text-slate-300 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-800 transition cursor-pointer" title="Haga clic para ver diagnósticos de conexión / configuración">
+                    <span id="sync-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500 mr-2"></span>
+                    <span id="sync-status-text">Modo Local (Autónomo)</span>
+                    <i class="fa-solid fa-circle-info ml-2 text-slate-500 text-[11px]"></i>
+                </button>
 
                 <button onclick="openOperatorModal()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-200 transition">
                     <i class="fa-solid fa-user-check text-indigo-400"></i>
-                    <span class="text-slate-400">Operario:</span>
+                    <span class="text-slate-400 hidden sm:inline">Operario:</span>
                     <span id="active-operator-display" class="font-semibold text-white">Sin Registrar</span>
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- Main Content Container -->
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- KPI Metrics Grid -->
@@ -155,7 +213,6 @@
             </div>
         </div>
 
-        <!-- Navigation Tabs Bar -->
         <nav class="flex space-x-2 border-b border-slate-800 overflow-x-auto pb-1">
             <button id="tab-btn-workstation" onclick="switchTab('workstation')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition">
                 <i class="fa-solid fa-cash-register"></i>
@@ -183,11 +240,9 @@
             </button>
         </nav>
 
-        <!-- VIEW 1: WORKSTATION / PREPARATION DESK -->
         <section id="view-workstation" class="tab-content space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 
-                <!-- Section Header -->
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -201,7 +256,6 @@
                     </span>
                 </div>
 
-                <!-- Main Workstation Form -->
                 <form id="form-workstation" onsubmit="handleDispatchSubmit(event)" class="space-y-6">
                     
                     <!-- Pre-loaded Orders Dropdown -->
@@ -267,7 +321,7 @@
                                 <p id="msg-ws-sim" class="text-[11px] hidden"></p>
                             </div>
 
-                            <!-- eSIM Serial / Pin -->
+                            <!-- eSIM Serial -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-medium text-slate-300 flex items-center gap-2">
@@ -322,7 +376,7 @@
                         </div>
                     </div>
 
-                    <!-- Submission Action Controls -->
+                    <!-- Submission Controls -->
                     <div class="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div class="text-xs text-slate-400">
                             Responsable de Control: <span id="form-operator-footer" class="font-semibold text-indigo-400">Sin Registrar</span>
@@ -342,7 +396,6 @@
             </div>
         </section>
 
-        <!-- VIEW 2: GLOBAL SERIES VALIDATOR -->
         <section id="view-validator" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="border-b border-slate-800 pb-4">
@@ -364,11 +417,9 @@
             </div>
         </section>
 
-        <!-- VIEW 3: INVENTORY BASE -->
         <section id="view-inventory" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 
-                <!-- Category Sub-Bar & Actions -->
                 <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
                     <div class="flex space-x-4 border-b md:border-b-0 border-slate-800 text-xs font-semibold">
                         <button id="cat-btn-equipos" onclick="switchCategory('equipos')" class="cat-btn pb-3 border-b-2 border-indigo-500 text-indigo-400 font-bold">📱 Equipos</button>
@@ -388,12 +439,10 @@
                     </div>
                 </div>
 
-                <!-- Search Input -->
                 <div class="max-w-xs">
                     <input type="text" id="inventory-search" onkeyup="renderCategoryTable()" placeholder="Filtrar por serie o detalle..." class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
                 </div>
 
-                <!-- Inventory Table -->
                 <div class="overflow-x-auto rounded-xl border border-slate-800">
                     <table class="w-full text-left text-xs text-slate-300">
                         <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
@@ -415,7 +464,6 @@
             </div>
         </section>
 
-        <!-- VIEW 4: DISPATCHED ORDERS HISTORY -->
         <section id="view-orders" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -453,7 +501,6 @@
             </div>
         </section>
 
-        <!-- VIEW 5: MASSIVE IMPORT -->
         <section id="view-import" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="border-b border-slate-800 pb-4">
@@ -464,7 +511,6 @@
                     <p class="text-xs text-slate-400">Importe múltiples series de equipos, SIMs o pedidos asignados ordenados por agencia.</p>
                 </div>
 
-                <!-- Import Target Selector -->
                 <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     <label class="cursor-pointer">
                         <input type="radio" name="import-target" value="equipos" checked class="peer sr-only">
@@ -503,12 +549,11 @@
                     </label>
                 </div>
 
-                <!-- Dropzone Area -->
                 <div class="border-2 border-dashed border-slate-700 hover:border-emerald-500/50 rounded-2xl p-8 text-center bg-slate-950/50 transition">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-600 mb-3"></i>
                     <p class="text-sm font-medium text-slate-300 mb-1">Arrastre su archivo Excel (.xlsx) o CSV aquí</p>
                     <p class="text-xs text-slate-500 mb-4">
-                        Para pedidos y agencias, asegúrese de usar las columnas: 
+                        Para pedidos y agencias, se recomiendan las columnas: 
                         <code class="text-indigo-400">pedido</code>, <code class="text-indigo-400">agencia</code>, <code class="text-indigo-400">serie</code>, <code class="text-indigo-400">tipo</code>
                     </p>
                     
@@ -526,7 +571,6 @@
             </div>
         </section>
 
-        <!-- VIEW 6: AUDIT LOG -->
         <section id="view-audit" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -559,7 +603,7 @@
 
     </main>
 
-    <!-- Custom Confirmation Modal -->
+    <!-- Modal: Confirm Action -->
     <div id="modal-confirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
             <div class="flex items-center gap-3">
@@ -578,7 +622,7 @@
         </div>
     </div>
 
-    <!-- Operator Modal -->
+    <!-- Modal: Register Operator -->
     <div id="modal-operator" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
             <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -593,7 +637,7 @@
         </div>
     </div>
 
-    <!-- Add Item Modal -->
+    <!-- Modal: Add Item to Inventory -->
     <div id="modal-add-item" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
             <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -625,8 +669,86 @@
         </div>
     </div>
 
+    <!-- Modal: Firebase Help & Status / Config Settings -->
+    <div id="modal-firebase-help" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xl shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-database text-cyan-400"></i> Estado y Configuración de Firebase
+                </h3>
+                <button onclick="closeFirebaseHelpModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <!-- Diagnostics Box -->
+            <div class="space-y-4 text-xs text-slate-300">
+                <div>
+                    <p class="font-semibold text-slate-200 mb-1">📊 Estado Actual del Conector:</p>
+                    <div id="firebase-status-details" class="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] leading-relaxed text-amber-300"></div>
+                </div>
+
+                <!-- Cloud Sync Toggle Button -->
+                <div class="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 flex items-center justify-between gap-4">
+                    <div>
+                        <p class="font-semibold text-slate-200">Sincronización Cloud (Firebase)</p>
+                        <p class="text-[11px] text-slate-400">El sistema opera por defecto en modo local para evitar errores de red o base de datos no configurada.</p>
+                    </div>
+                    <button id="toggle-firebase-btn" onclick="toggleFirebaseSyncPreference()" class="px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap">
+                        Cargando...
+                    </button>
+                </div>
+
+                <!-- Custom Firebase Credentials Form -->
+                <div class="border-t border-slate-800 pt-3 space-y-3">
+                    <p class="font-semibold text-slate-200 flex items-center gap-1.5">
+                        <i class="fa-solid fa-sliders text-indigo-400"></i>
+                        Parámetros de Configuración Firebase:
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-0.5">Project ID</label>
+                            <input type="text" id="cfg-project-id" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-mono text-[11px]">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-0.5">API Key</label>
+                            <input type="text" id="cfg-api-key" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-mono text-[11px]">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-0.5">Auth Domain</label>
+                            <input type="text" id="cfg-auth-domain" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-mono text-[11px]">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-0.5">Storage Bucket</label>
+                            <input type="text" id="cfg-storage-bucket" class="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 font-mono text-[11px]">
+                        </div>
+                    </div>
+                    <button onclick="saveCustomFirebaseConfig()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-medium text-xs transition">
+                        <i class="fa-solid fa-floppy-disk mr-1.5"></i> Guardar Nueva Configuración Firebase
+                    </button>
+                </div>
+
+                <div class="border-t border-slate-800 pt-3">
+                    <p class="font-semibold text-slate-200 mb-1">📌 Para resolver el error <code>[code=not-found]: database (default) does not exist</code>:</p>
+                    <p class="text-slate-400 text-[11px] mb-2">Si desea utilizar sincronización remota, asegúrese de haber creado la base de datos Firestore en Firebase Console:</p>
+                    
+                    <ol class="list-decimal list-inside space-y-1.5 text-slate-300 text-[11px] bg-slate-950 p-3 rounded-xl border border-slate-800">
+                        <li>Abra la consola: <a href="https://console.firebase.google.com/project/preparacion-cd3q/firestore" target="_blank" class="text-cyan-400 underline font-mono">console.firebase.google.com</a></li>
+                        <li>Navegue a <b>Build (Compilación) &rarr; Firestore Database</b>.</li>
+                        <li>Haga clic en <b>"Crear base de datos" (Create database)</b>.</li>
+                        <li>Seleccione la ubicación por defecto y elija <b>"Comenzar en modo de prueba" (Test mode)</b>.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+                <button onclick="closeFirebaseHelpModal()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
+                    Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        /* Database and State Initialization */
+        /* Database State Initialization */
         let db = {
             equipos: [],
             sim: [],
@@ -640,8 +762,9 @@
         let activeOperator = localStorage.getItem('cnt_operator') || 'Sin Registrar';
         let currentCategoryView = 'equipos';
         let pendingImportData = null;
+        let firebaseStatusMessage = "Modo Local Autónomo Activo. Sincronización desactivada por defecto.";
 
-        // Custom UI Notification Toast
+        /* Toast Notifications */
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -673,7 +796,6 @@
             }, 3500);
         }
 
-        // Custom Confirm Dialog Replacement (No native confirm())
         function showConfirmDialog(message, onConfirm) {
             const modal = document.getElementById('modal-confirm');
             document.getElementById('confirm-modal-text').textContent = message;
@@ -704,16 +826,142 @@
             updateStats();
             renderPendingOrdersDropdown();
             renderAuditLog();
+            initFirebaseSync();
+            populateFirebaseConfigForm();
         });
 
-        /* Navigation Tab Handler */
-        function switchTab(tabId) {
+        async function initFirebaseSync() {
+            const statusText = document.getElementById('sync-status-text');
+            const statusDot = document.getElementById('sync-status-dot');
+
+            if (!window.firebaseSyncEnabled || !window.firebaseServices) {
+                firebaseStatusMessage = "🟢 Modo Local Activo. La aplicación está guardando datos localmente en este navegador.";
+                if (statusText && statusDot) {
+                    statusText.textContent = "Modo Local (Autónomo)";
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500 mr-2";
+                }
+                updateToggleFirebaseButton();
+                return;
+            }
+
+            try {
+                window.firebaseServices.subscribeToState(
+                    (cloudData) => {
+                        if (cloudData && cloudData.db) {
+                            db = cloudData.db;
+                            saveLocalStorage(false);
+                            updateStats();
+                            renderPendingOrdersDropdown();
+                            renderCategoryTable();
+                            renderOrdersTable();
+                            renderAuditLog();
+                        }
+                        firebaseStatusMessage = "🟢 Conectado y sincronizado exitosamente con la base de datos Firestore en la nube.";
+                        if (statusText && statusDot) {
+                            statusText.textContent = "Sincronizado con Firebase";
+                            statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2";
+                        }
+                        updateToggleFirebaseButton();
+                    },
+                    (err) => {
+                        console.warn("Aviso de conexión Firestore:", err.message);
+                        
+                        if (err.code === 'not-found' || (err.message && err.message.includes('not exist'))) {
+                            firebaseStatusMessage = `⚠️ [code=not-found]: La base de datos Firestore aún no ha sido creada en la consola del proyecto Firebase.\n\nEl sistema continúa operando normalmente en MODO LOCAL.`;
+                            if (statusText && statusDot) {
+                                statusText.textContent = "Modo Local (Sin BD en Cloud)";
+                                statusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 mr-2";
+                            }
+                        } else {
+                            firebaseStatusMessage = `Modo Local Activo (Aviso de conexión: ${err.message})`;
+                            if (statusText && statusDot) {
+                                statusText.textContent = "Modo Local (Offline)";
+                                statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500 mr-2";
+                            }
+                        }
+                        updateToggleFirebaseButton();
+                    }
+                );
+            } catch (e) {
+                console.warn("Conexión inicial Firebase no disponible:", e.message);
+                firebaseStatusMessage = `Modo Local (Error de inicialización: ${e.message})`;
+                if (statusText && statusDot) {
+                    statusText.textContent = "Modo Local (Offline)";
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500 mr-2";
+                }
+                updateToggleFirebaseButton();
+            }
+        }
+
+        function populateFirebaseConfigForm() {
+            const cfg = window.firebaseConfig || {};
+            if (document.getElementById('cfg-project-id')) document.getElementById('cfg-project-id').value = cfg.projectId || '';
+            if (document.getElementById('cfg-api-key')) document.getElementById('cfg-api-key').value = cfg.apiKey || '';
+            if (document.getElementById('cfg-auth-domain')) document.getElementById('cfg-auth-domain').value = cfg.authDomain || '';
+            if (document.getElementById('cfg-storage-bucket')) document.getElementById('cfg-storage-bucket').value = cfg.storageBucket || '';
+        }
+
+        function saveCustomFirebaseConfig() {
+            const projectId = document.getElementById('cfg-project-id').value.trim();
+            const apiKey = document.getElementById('cfg-api-key').value.trim();
+            const authDomain = document.getElementById('cfg-auth-domain').value.trim();
+            const storageBucket = document.getElementById('cfg-storage-bucket').value.trim();
+
+            if (!projectId || !apiKey) {
+                showToast('Ingrese al menos el Project ID y la API Key.', 'warning');
+                return;
+            }
+
+            const newConfig = {
+                apiKey,
+                authDomain: authDomain || `${projectId}.firebaseapp.com`,
+                projectId,
+                storageBucket: storageBucket || `${projectId}.firebasestorage.app`
+            };
+
+            localStorage.setItem('cnt_firebase_config', JSON.stringify(newConfig));
+            showToast('Configuración guardada. Recargando...', 'success');
+            setTimeout(() => location.reload(), 800);
+        }
+
+        function updateToggleFirebaseButton() {
+            const btn = document.getElementById('toggle-firebase-btn');
+            if (!btn) return;
+
+            if (window.firebaseSyncEnabled) {
+                btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/50";
+                btn.textContent = "Desactivar Cloud Sync";
+            } else {
+                btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition bg-emerald-700 hover:bg-emerald-600 text-white shadow-md";
+                btn.textContent = "Activar Cloud Sync";
+            }
+        }
+
+        function toggleFirebaseSyncPreference() {
+            const current = window.firebaseSyncEnabled;
+            const newPref = !current;
+            localStorage.setItem('cnt_firebase_enabled', newPref ? 'true' : 'false');
+            window.firebaseSyncEnabled = newPref;
+            showToast(`Sincronización Cloud ${newPref ? 'Activada' : 'Desactivada'}. Recargando...`, 'info');
+            setTimeout(() => {
+                location.reload();
+            }, 600);
+        }
+
+        async function syncToFirebaseCloud() {
+            if (!window.firebaseSyncEnabled || !window.firebaseServices) return;
+            await window.firebaseServices.saveState(db);
+        }
+
+        window.switchTab = function(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition";
             });
 
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const targetView = document.getElementById(`view-${tabId}`);
+            if (targetView) targetView.classList.remove('hidden');
+            
             const activeBtn = document.getElementById(`tab-btn-${tabId}`);
             if (activeBtn) {
                 activeBtn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition";
@@ -721,9 +969,8 @@
 
             if (tabId === 'inventory') renderCategoryTable();
             if (tabId === 'orders') renderOrdersTable();
-        }
+        };
 
-        /* Category Sub-Tab Handler */
         function switchCategory(cat) {
             currentCategoryView = cat;
             document.querySelectorAll('.cat-btn').forEach(btn => {
@@ -736,7 +983,6 @@
             renderCategoryTable();
         }
 
-        /* Operator Management */
         function openOperatorModal() { document.getElementById('modal-operator').classList.remove('hidden'); }
         function closeOperatorModal() { document.getElementById('modal-operator').classList.add('hidden'); }
         function saveOperatorName() {
@@ -755,7 +1001,14 @@
             document.getElementById('form-operator-footer').textContent = activeOperator;
         }
 
-        /* Live Field Validation & Checking */
+        function openFirebaseHelpModal() {
+            document.getElementById('firebase-status-details').textContent = firebaseStatusMessage;
+            document.getElementById('modal-firebase-help').classList.remove('hidden');
+        }
+        function closeFirebaseHelpModal() {
+            document.getElementById('modal-firebase-help').classList.add('hidden');
+        }
+
         function validateFieldLive(type) {
             const inputVal = document.getElementById(`ws-serie-${type}`).value.trim();
             const badge = document.getElementById(`badge-ws-${type}`);
@@ -768,7 +1021,6 @@
                 return;
             }
 
-            // Split in case of comma separated series
             const seriesList = inputVal.split(',').map(s => s.trim()).filter(s => s.length > 0);
             let notFound = [];
             let dispatched = [];
@@ -803,24 +1055,20 @@
             }
         }
 
-        /* Select Pre-loaded Order and auto-populate order #, agency, and all series */
         function handleSelectPendingOrder(idx) {
             if (idx === "" || idx === null || idx === undefined) return;
             
             const selected = db.pendingOrders[idx];
             if (!selected) return;
 
-            // 1. Assign Order number and Agency
             document.getElementById('ws-order-number').value = selected.orderNum || '';
             document.getElementById('ws-agency').value = selected.agency || 'Agencia Sin Especificar';
 
-            // 2. Clear current series inputs
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => {
                 const input = document.getElementById(`ws-serie-${type}`);
                 if (input) input.value = '';
             });
 
-            // 3. Populate all series associated with this order
             if (selected.series && selected.series.length > 0) {
                 selected.series.forEach(item => {
                     const inputId = `ws-serie-${item.tipo}`;
@@ -836,12 +1084,10 @@
                 });
             }
 
-            // Trigger live validation for populated series
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => validateFieldLive(type));
             showToast(`Pedido ${selected.orderNum} cargado con ${selected.series ? selected.series.length : 0} series.`, 'info');
         }
 
-        /* Render pending orders dropdown with multi-series count */
         function renderPendingOrdersDropdown() {
             const select = document.getElementById('ws-select-pending-order');
             select.innerHTML = '<option value="">-- Seleccionar Pedido Cargado (Auto-completa Pedido y Agencia) --</option>';
@@ -858,7 +1104,6 @@
             if (badge) badge.textContent = `${db.pendingOrders.length} Pedidos Pendientes`;
         }
 
-        /* Dispatch Submission Handler */
         function handleDispatchSubmit(e) {
             e.preventDefault();
             const orderNum = document.getElementById('ws-order-number').value.trim();
@@ -885,7 +1130,6 @@
                 date: new Date().toLocaleString('es-EC')
             };
 
-            // Mark items as used across categories
             const categories = [
                 { type: 'equipos', input: eqSerie },
                 { type: 'sim', input: simSerie },
@@ -912,7 +1156,6 @@
             });
 
             db.orders.unshift(orderData);
-            // Remove from pending orders queue
             db.pendingOrders = db.pendingOrders.filter(p => p.orderNum !== orderNum);
 
             saveLocalStorage();
@@ -937,7 +1180,6 @@
             });
         }
 
-        /* Bulk File Import Logic */
         function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -961,7 +1203,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        /* Confirm Import & Group Multi-series Orders */
         function confirmImport() {
             if (!pendingImportData) return;
             const target = document.querySelector('input[name="import-target"]:checked').value;
@@ -980,7 +1221,6 @@
 
                     if (!orderNum) return;
 
-                    // Group by order number so multiple series are stored under the same order and agency
                     let existingOrder = db.pendingOrders.find(p => p.orderNum === orderNum);
 
                     if (existingOrder) {
@@ -1017,7 +1257,6 @@
             pendingImportData = null;
         }
 
-        /* Global Search Validator */
         function runGlobalValidation() {
             const query = document.getElementById('validator-input').value.trim();
             const resultCard = document.getElementById('validator-result');
@@ -1058,10 +1297,10 @@
             }
         }
 
-        /* Render Inventory Tables */
         function renderCategoryTable() {
             const tbody = document.getElementById('inventory-table-body');
-            const filter = document.getElementById('inventory-search').value.toLowerCase();
+            const filterInput = document.getElementById('inventory-search');
+            const filter = filterInput ? filterInput.value.toLowerCase() : '';
             tbody.innerHTML = '';
 
             let list = db[currentCategoryView] || [];
@@ -1112,7 +1351,6 @@
             });
         }
 
-        /* Render Dispatched Orders Table */
         function renderOrdersTable() {
             const tbody = document.getElementById('orders-table-body');
             tbody.innerHTML = '';
@@ -1141,7 +1379,6 @@
             });
         }
 
-        /* Single Item Creation */
         function openAddItemModal() { document.getElementById('modal-add-item').classList.remove('hidden'); }
         function closeAddItemModal() { document.getElementById('modal-add-item').classList.add('hidden'); }
         function saveSingleItem() {
@@ -1163,7 +1400,6 @@
             showToast('Ítem guardado correctamente.', 'success');
         }
 
-        /* Stats & Persistence */
         function updateStats() {
             document.getElementById('stat-equipos').textContent = db.equipos.filter(i => i.status !== 'Despachado').length;
             document.getElementById('stat-sims').textContent = db.sim.filter(i => i.status !== 'Despachado').length;
@@ -1171,7 +1407,13 @@
             document.getElementById('stat-pedidos').textContent = db.orders.length;
         }
 
-        function saveLocalStorage() { localStorage.setItem('cnt_db', JSON.stringify(db)); }
+        function saveLocalStorage(triggerSync = true) { 
+            localStorage.setItem('cnt_db', JSON.stringify(db)); 
+            if (triggerSync) {
+                syncToFirebaseCloud();
+            }
+        }
+
         function loadLocalStorage() {
             const data = localStorage.getItem('cnt_db');
             if (data) {
@@ -1185,13 +1427,13 @@
             }
         }
 
-        /* Audit Trail Log */
         function logAuditEvent(event, detail) {
             const entry = {
                 timestamp: new Date().toLocaleString('es-EC'),
                 operator: activeOperator,
                 event, detail
             };
+            if (!db.audit) db.audit = [];
             db.audit.unshift(entry);
             saveLocalStorage();
             renderAuditLog();
@@ -1213,9 +1455,8 @@
             });
         }
 
-        /* Excel Exporters */
         function exportInventoryToExcel() {
-            const ws = XLSX.utils.json_to_sheet(db[currentCategoryView]);
+            const ws = XLSX.utils.json_to_sheet(db[currentCategoryView] || []);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, currentCategoryView.toUpperCase());
             XLSX.writeFile(wb, `Inventario_${currentCategoryView}_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -1223,31 +1464,12 @@
         }
 
         function exportOrdersToExcel() {
-            const ws = XLSX.utils.json_to_sheet(db.orders);
+            const ws = XLSX.utils.json_to_sheet(db.orders || []);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "PEDIDOS_DESPACHADOS");
             XLSX.writeFile(wb, `Reporte_Pedidos_CNT_${new Date().toISOString().slice(0,10)}.xlsx`);
             showToast('Pedidos despachados exportados a Excel.', 'success');
         }
-        // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBUYs6yfnAJ3IuDzd9u3K0F0T74dxLnl1Q",
-  authDomain: "preparacion-cd3q.firebaseapp.com",
-  projectId: "preparacion-cd3q",
-  storageBucket: "preparacion-cd3q.firebasestorage.app",
-  messagingSenderId: "669973043687",
-  appId: "1:669973043687:web:8542cd541f414c2d718542"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
     </script>
-<input type="text" id="miCampo" placeholder="Escribe un mensaje o dato...">
-<button onclick="guardarDato()">Guardar en Firebase</button>
 </body>
 </html>
