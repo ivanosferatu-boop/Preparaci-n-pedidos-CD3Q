@@ -831,9 +831,10 @@
             reader.onload = (evt) => {
                 try {
                     const data = new Uint8Array(evt.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    // Use raw: false so long numeric values like ICCIDs/IMEIs retain full string precision
+                    const workbook = XLSX.read(data, { type: 'array', raw: false, defval: '' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const json = XLSX.utils.sheet_to_json(sheet);
+                    const json = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: '' });
 
                     if (!json || json.length === 0) {
                         showToast('El archivo cargado está vacío o no tiene formato válido.', 'warning');
@@ -841,12 +842,21 @@
                     }
 
                     pendingImportData = json;
-                    document.getElementById('import-preview-content').textContent = JSON.stringify(json.slice(0, 5), null, 2) + `\n... y ${json.length > 5 ? json.length - 5 : 0} filas más.`;
+                    
+                    // Display sample preview and column info
+                    const sample = json.slice(0, 5);
+                    const detectedCols = Object.keys(json[0] || {}).join(', ');
+
+                    document.getElementById('import-preview-content').textContent = 
+                        `Columnas detectadas: [ ${detectedCols} ]\n\n` +
+                        JSON.stringify(sample, null, 2) + 
+                        `\n... y ${json.length > 5 ? json.length - 5 : 0} filas más.`;
+                    
                     document.getElementById('import-preview').classList.remove('hidden');
-                    showToast(`Archivo cargado con ${json.length} filas listas para importar.`, 'info');
+                    showToast(`Archivo cargado con ${json.length} filas. Revise la vista previa y confirme.`, 'info');
                 } catch (err) {
                     console.error("Error al leer archivo:", err);
-                    showToast('Error al procesar el archivo Excel.', 'error');
+                    showToast('Error al procesar el archivo Excel. Verifique que no esté dañado.', 'error');
                 }
             };
             reader.readAsArrayBuffer(file);
@@ -860,14 +870,26 @@
 
             const target = document.querySelector('input[name="import-target"]:checked').value;
 
+            const SERIES_FIELDS = [
+                'serie', 'series', 'imei', 'iccid', 'iccid_sim', 'icc', 'nro_serie', 'nro serie', 
+                'numero_serie', 'numero serie', 'n_serie', 'nserie', 'sn', 'serial', 'codigo', 
+                'cod_serie', 'identificador', 'barcode', 'secuencia', 'simcard', 'sim', 'equipo', 
+                'valor', 'articulo', 'material', 'n'
+            ];
+
+            const DETAIL_FIELDS = [
+                'detail', 'detalle', 'modelo', 'descripcion', 'nombre', 'equipo', 'pack', 
+                'material', 'denominacion', 'texto_breve', 'producto', 'observacion'
+            ];
+
             if (target === 'pedidos') {
                 let countNew = 0;
                 let countUpdated = 0;
 
                 pendingImportData.forEach(r => {
-                    const orderNum = extractRowField(r, ['orderNum', 'pedido', 'orden', 'numero', 'order', 'num']);
-                    const agency = extractRowField(r, ['agency', 'agencia', 'destino', 'sucursal', 'oficina']);
-                    const serie = extractRowField(r, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial']);
+                    const orderNum = extractRowField(r, ['orderNum', 'pedido', 'orden', 'numero', 'order', 'num', 'nro_pedido']);
+                    const agency = extractRowField(r, ['agency', 'agencia', 'destino', 'sucursal', 'oficina', 'bodega']);
+                    const serie = extractRowField(r, SERIES_FIELDS);
                     let tipo = extractRowField(r, ['tipo', 'type', 'categoria', 'cat']).toLowerCase();
 
                     if (!['equipo', 'sim', 'esim', 'publicidad'].includes(tipo)) {
@@ -898,36 +920,53 @@
                 showToast(`Se cargaron ${countNew} pedidos nuevos y se actualizaron ${countUpdated}.`, 'success');
             } else {
                 let imported = 0;
+                let duplicateCount = 0;
+                let invalidCount = 0;
+
                 pendingImportData.forEach(r => {
-                    let serie = extractRowField(r, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial', 'id', 'barcode']);
+                    let serie = extractRowField(r, SERIES_FIELDS);
                     
-                    // Fallback to first non-empty cell if header name didn't match
+                    // Fallback 1: First non-empty value in row
                     if (!serie) {
                         const vals = Object.values(r).map(v => v !== undefined && v !== null ? String(v).trim() : '').filter(Boolean);
-                        if (vals.length > 0) serie = vals[0];
+                        if (vals.length > 0 && vals[0].length >= 3) {
+                            serie = vals[0];
+                        }
                     }
 
-                    let detail = extractRowField(r, ['detail', 'detalle', 'modelo', 'descripcion', 'nombre', 'equipo', 'pack', 'material']);
+                    let detail = extractRowField(r, DETAIL_FIELDS);
                     if (!detail) {
                         const vals = Object.values(r).map(v => v !== undefined && v !== null ? String(v).trim() : '').filter(Boolean);
                         if (vals.length > 1 && vals[0] === serie) detail = vals[1];
                     }
 
                     if (serie) {
-                        const exists = db[target].some(item => item.serie === serie);
+                        const exists = db[target].some(item => String(item.serie).trim() === String(serie).trim());
                         if (!exists) {
                             db[target].push({
-                                serie,
+                                serie: String(serie).trim(),
                                 detail: detail || 'Carga Masiva Excel',
                                 status: 'Disponible',
                                 date: new Date().toLocaleDateString('es-EC')
                             });
                             imported++;
+                        } else {
+                            duplicateCount++;
                         }
+                    } else {
+                        invalidCount++;
                     }
                 });
+
                 renderCategoryTable();
-                showToast(`Se importaron ${imported} series nuevas a ${target.toUpperCase()}.`, 'success');
+
+                if (imported > 0) {
+                    showToast(`Éxito: Se importaron ${imported} series a ${target.toUpperCase()}.${duplicateCount > 0 ? ` (${duplicateCount} omitidas por ya existir).` : ''}`, 'success');
+                } else if (duplicateCount > 0) {
+                    showToast(`⚠️ Se leyeron ${duplicateCount} series, pero TODAS ya estaban registradas previamente en ${target.toUpperCase()}.`, 'warning');
+                } else {
+                    showToast(`⚠️ No se pudo identificar ninguna columna de serie en el archivo. Verifique que los encabezados contengan 'SERIE', 'ICCID' o 'IMEI'.`, 'warning');
+                }
             }
 
             saveLocalStorage();
