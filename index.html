@@ -269,9 +269,14 @@
                                 <i class="fa-solid fa-plus text-[10px]"></i> Generar Nuevo Pedido
                             </button>
                         </div>
-                        <select id="ws-select-pending-order" onchange="handleSelectPendingOrder(this.value)" class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500">
-                            <option value="">-- Seleccionar Pedido Cargado --</option>
-                        </select>
+                        <div class="flex gap-2">
+                            <select id="ws-select-pending-order" onchange="handleSelectPendingOrder(this.value)" class="flex-grow px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 text-xs sm:text-sm font-mono focus:outline-none focus:border-indigo-500">
+                                <option value="">-- Seleccionar Pedido Cargado --</option>
+                            </select>
+                            <button type="button" onclick="deleteSelectedPendingOrder()" class="bg-rose-950/80 hover:bg-rose-900 border border-rose-800/60 text-rose-300 text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium shadow-sm" title="Eliminar el pedido pendiente seleccionado">
+                                <i class="fa-solid fa-trash-can text-rose-400"></i> <span class="hidden sm:inline">Borrar</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Primary Order Identification & Destination -->
@@ -496,6 +501,7 @@
                                 <th class="p-3">Series Vinculadas</th>
                                 <th class="p-3">Operario</th>
                                 <th class="p-3">Fecha y Hora</th>
+                                <th class="p-3 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="orders-table-body" class="divide-y divide-slate-800/60 bg-slate-900/40">
@@ -781,484 +787,40 @@
     </div>
 
     <script>
-        /* Database State Initialization */
-        let db = {
-            equipos: [],
-            sim: [],
-            esim: [],
-            publicidad: [],
-            orders: [],
-            pendingOrders: [],
-            audit: []
-        };
-
-        let activeOperator = localStorage.getItem('cnt_operator') || 'Operario General';
-        let pendingSubmitAfterOperator = false;
-        let currentCategoryView = 'equipos';
-        let pendingImportData = null;
-        let firebaseStatusMessage = "Modo Local Autónomo Activo. Sincronización desactivada por defecto.";
-
-        /* Toast Notifications */
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
+        function extractRowField(row, possibleFields) {
+            if (!row || typeof row !== 'object') return '';
+            const keys = Object.keys(row);
             
-            const colors = {
-                success: 'bg-emerald-950/90 border-emerald-800 text-emerald-200',
-                error: 'bg-rose-950/90 border-rose-800 text-rose-200',
-                warning: 'bg-amber-950/90 border-amber-800 text-amber-200',
-                info: 'bg-indigo-950/90 border-indigo-800 text-indigo-200'
-            };
-
-            const icons = {
-                success: 'fa-circle-check text-emerald-400',
-                error: 'fa-circle-xmark text-rose-400',
-                warning: 'fa-triangle-exclamation text-amber-400',
-                info: 'fa-circle-info text-indigo-400'
-            };
-
-            toast.className = `p-3.5 rounded-xl border backdrop-blur-md shadow-2xl flex items-center space-x-3 text-xs transition-all transform duration-300 pointer-events-auto ${colors[type] || colors.info}`;
-            toast.innerHTML = `
-                <i class="fa-solid ${icons[type] || icons.info} text-base"></i>
-                <span class="flex-grow font-medium">${message}</span>
-            `;
-
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-x-4');
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        }
-
-        function showConfirmDialog(message, onConfirm) {
-            const modal = document.getElementById('modal-confirm');
-            document.getElementById('confirm-modal-text').textContent = message;
-            modal.classList.remove('hidden');
-
-            const okBtn = document.getElementById('confirm-modal-ok');
-            const cancelBtn = document.getElementById('confirm-modal-cancel');
-
-            const cleanUp = () => {
-                modal.classList.add('hidden');
-                okBtn.onclick = null;
-                cancelBtn.onclick = null;
-            };
-
-            okBtn.onclick = () => {
-                cleanUp();
-                onConfirm();
-            };
-            cancelBtn.onclick = () => {
-                cleanUp();
-            };
-        }
-
-        /* App Initialization */
-        document.addEventListener('DOMContentLoaded', () => {
-            loadLocalStorage();
-            updateOperatorDisplay();
-            updateStats();
-            renderPendingOrdersDropdown();
-            renderAuditLog();
-            initFirebaseSync();
-            populateFirebaseConfigForm();
-        });
-
-        async function initFirebaseSync() {
-            const statusText = document.getElementById('sync-status-text');
-            const statusDot = document.getElementById('sync-status-dot');
-
-            if (!window.firebaseSyncEnabled || !window.firebaseServices) {
-                firebaseStatusMessage = "🟢 Modo Local Activo. La aplicación está guardando datos localmente en este navegador.";
-                if (statusText && statusDot) {
-                    statusText.textContent = "Modo Local (Autónomo)";
-                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500 mr-2";
-                }
-                updateToggleFirebaseButton();
-                return;
-            }
-
-            try {
-                window.firebaseServices.subscribeToState(
-                    (cloudData) => {
-                        if (cloudData && cloudData.db) {
-                            db = cloudData.db;
-                            saveLocalStorage(false);
-                            updateStats();
-                            renderPendingOrdersDropdown();
-                            renderCategoryTable();
-                            renderOrdersTable();
-                            renderAuditLog();
+            // 1. Try exact or normalized name match
+            for (const field of possibleFields) {
+                const targetClean = field.toLowerCase().replace(/[^a-z0-9]/g, '');
+                for (const k of keys) {
+                    const keyClean = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (keyClean === targetClean) {
+                        const val = row[k];
+                        if (val !== undefined && val !== null && String(val).trim() !== '') {
+                            return String(val).trim();
                         }
-                        firebaseStatusMessage = "🟢 Conectado y sincronizado exitosamente con la base de datos Firestore en la nube.";
-                        if (statusText && statusDot) {
-                            statusText.textContent = "Sincronizado con Firebase";
-                            statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2";
-                        }
-                        updateToggleFirebaseButton();
-                    },
-                    (err) => {
-                        console.warn("Aviso de conexión Firestore:", err.message);
-                        
-                        if (err.code === 'not-found' || (err.message && err.message.includes('not exist'))) {
-                            firebaseStatusMessage = `⚠️ [code=not-found]: La base de datos Firestore aún no ha sido creada en la consola del proyecto Firebase.\n\nEl sistema continúa operando normalmente en MODO LOCAL.`;
-                            if (statusText && statusDot) {
-                                statusText.textContent = "Modo Local (Sin BD en Cloud)";
-                                statusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 mr-2";
-                            }
-                        } else {
-                            firebaseStatusMessage = `Modo Local Activo (Aviso de conexión: ${err.message})`;
-                            if (statusText && statusDot) {
-                                statusText.textContent = "Modo Local (Offline)";
-                                statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500 mr-2";
-                            }
-                        }
-                        updateToggleFirebaseButton();
-                    }
-                );
-            } catch (e) {
-                console.warn("Conexión inicial Firebase no disponible:", e.message);
-                firebaseStatusMessage = `Modo Local (Error de inicialización: ${e.message})`;
-                if (statusText && statusDot) {
-                    statusText.textContent = "Modo Local (Offline)";
-                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500 mr-2";
-                }
-                updateToggleFirebaseButton();
-            }
-        }
-
-        function populateFirebaseConfigForm() {
-            const cfg = window.firebaseConfig || {};
-            if (document.getElementById('cfg-project-id')) document.getElementById('cfg-project-id').value = cfg.projectId || '';
-            if (document.getElementById('cfg-api-key')) document.getElementById('cfg-api-key').value = cfg.apiKey || '';
-            if (document.getElementById('cfg-auth-domain')) document.getElementById('cfg-auth-domain').value = cfg.authDomain || '';
-            if (document.getElementById('cfg-storage-bucket')) document.getElementById('cfg-storage-bucket').value = cfg.storageBucket || '';
-        }
-
-        function saveCustomFirebaseConfig() {
-            const projectId = document.getElementById('cfg-project-id').value.trim();
-            const apiKey = document.getElementById('cfg-api-key').value.trim();
-            const authDomain = document.getElementById('cfg-auth-domain').value.trim();
-            const storageBucket = document.getElementById('cfg-storage-bucket').value.trim();
-
-            if (!projectId || !apiKey) {
-                showToast('Ingrese al menos el Project ID y la API Key.', 'warning');
-                return;
-            }
-
-            const newConfig = {
-                apiKey,
-                authDomain: authDomain || `${projectId}.firebaseapp.com`,
-                projectId,
-                storageBucket: storageBucket || `${projectId}.firebasestorage.app`
-            };
-
-            localStorage.setItem('cnt_firebase_config', JSON.stringify(newConfig));
-            showToast('Configuración guardada. Recargando...', 'success');
-            setTimeout(() => location.reload(), 800);
-        }
-
-        function updateToggleFirebaseButton() {
-            const btn = document.getElementById('toggle-firebase-btn');
-            if (!btn) return;
-
-            if (window.firebaseSyncEnabled) {
-                btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/50";
-                btn.textContent = "Desactivar Cloud Sync";
-            } else {
-                btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition bg-emerald-700 hover:bg-emerald-600 text-white shadow-md";
-                btn.textContent = "Activar Cloud Sync";
-            }
-        }
-
-        function toggleFirebaseSyncPreference() {
-            const current = window.firebaseSyncEnabled;
-            const newPref = !current;
-            localStorage.setItem('cnt_firebase_enabled', newPref ? 'true' : 'false');
-            window.firebaseSyncEnabled = newPref;
-            showToast(`Sincronización Cloud ${newPref ? 'Activada' : 'Desactivada'}. Recargando...`, 'info');
-            setTimeout(() => {
-                location.reload();
-            }, 600);
-        }
-
-        async function syncToFirebaseCloud() {
-            if (!window.firebaseSyncEnabled || !window.firebaseServices) return;
-            await window.firebaseServices.saveState(db);
-        }
-
-        window.switchTab = function(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition";
-            });
-
-            const targetView = document.getElementById(`view-${tabId}`);
-            if (targetView) targetView.classList.remove('hidden');
-            
-            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
-            if (activeBtn) {
-                activeBtn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition";
-            }
-
-            if (tabId === 'inventory') renderCategoryTable();
-            if (tabId === 'orders') renderOrdersTable();
-        };
-
-        function switchCategory(cat) {
-            currentCategoryView = cat;
-            document.querySelectorAll('.cat-btn').forEach(btn => {
-                btn.className = "cat-btn pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200";
-            });
-            const activeCatBtn = document.getElementById(`cat-btn-${cat}`);
-            if (activeCatBtn) {
-                activeCatBtn.className = "cat-btn pb-3 border-b-2 border-indigo-500 text-indigo-400 font-bold";
-            }
-            renderCategoryTable();
-        }
-
-        function openOperatorModal() { document.getElementById('modal-operator').classList.remove('hidden'); }
-        function closeOperatorModal() { document.getElementById('modal-operator').classList.add('hidden'); }
-        function saveOperatorName() {
-            const val = document.getElementById('operator-input-name').value.trim();
-            if (val) {
-                activeOperator = val;
-                localStorage.setItem('cnt_operator', val);
-                updateOperatorDisplay();
-                logAuditEvent('Operario Registrado', `Inició sesión de trabajo: ${val}`);
-                showToast(`Operario registrado: ${val}`, 'success');
-                closeOperatorModal();
-
-                if (pendingSubmitAfterOperator) {
-                    pendingSubmitAfterOperator = false;
-                    const form = document.getElementById('form-workstation');
-                    if (form) {
-                        form.requestSubmit();
                     }
                 }
             }
-        }
-        function updateOperatorDisplay() {
-            document.getElementById('active-operator-display').textContent = activeOperator;
-            document.getElementById('form-operator-footer').textContent = activeOperator;
-        }
-
-        /* Modal Generar Nuevo Pedido */
-        function openNewOrderModal() {
-            document.getElementById('modal-new-order').classList.remove('hidden');
-        }
-        function closeNewOrderModal() {
-            document.getElementById('modal-new-order').classList.add('hidden');
-            document.getElementById('new-order-number').value = '';
-            document.getElementById('new-order-agency').value = '';
-            document.getElementById('new-order-series').value = '';
-        }
-        function saveNewPendingOrder() {
-            const orderNum = document.getElementById('new-order-number').value.trim();
-            const agency = document.getElementById('new-order-agency').value.trim();
-            const seriesInput = document.getElementById('new-order-series').value.trim();
-
-            if (!orderNum || !agency) {
-                showToast('Número de pedido y agencia son obligatorios.', 'warning');
-                return;
-            }
-
-            const seriesList = seriesInput ? seriesInput.split(',').map(s => ({ serie: s.trim(), tipo: 'equipo' })).filter(s => s.serie) : [];
-
-            db.pendingOrders.push({
-                orderNum,
-                agency,
-                series: seriesList
-            });
-
-            saveLocalStorage();
-            updateStats();
-            renderPendingOrdersDropdown();
-            logAuditEvent('Pedido Generado', `Nuevo pedido pendiente #${orderNum} creado para ${agency}`);
-            showToast(`Pedido #${orderNum} generado correctamente.`, 'success');
-            closeNewOrderModal();
-        }
-
-        function openFirebaseHelpModal() {
-            document.getElementById('firebase-status-details').textContent = firebaseStatusMessage;
-            document.getElementById('modal-firebase-help').classList.remove('hidden');
-        }
-        function closeFirebaseHelpModal() {
-            document.getElementById('modal-firebase-help').classList.add('hidden');
-        }
-
-        function validateFieldLive(type) {
-            const inputVal = document.getElementById(`ws-serie-${type}`).value.trim();
-            const badge = document.getElementById(`badge-ws-${type}`);
-            const msg = document.getElementById(`msg-ws-${type}`);
-
-            if (!inputVal) {
-                badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
-                badge.textContent = "Sin Validar";
-                msg.classList.add('hidden');
-                return;
-            }
-
-            const seriesList = inputVal.split(',').map(s => s.trim()).filter(s => s.length > 0);
-            let notFound = [];
-            let dispatched = [];
-            let valid = [];
-
-            seriesList.forEach(s => {
-                const found = db[type].find(item => item.serie === s);
-                if (!found) {
-                    notFound.push(s);
-                } else if (found.status === 'Despachado') {
-                    dispatched.push(s);
-                } else {
-                    valid.push(s);
-                }
-            });
-
-            if (notFound.length > 0 || dispatched.length > 0) {
-                badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800/50";
-                badge.textContent = `${valid.length}/${seriesList.length} Válidas`;
-                msg.className = "text-[11px] mt-1 text-amber-400";
-                let detailMsg = [];
-                if (notFound.length) detailMsg.push(`No registradas: ${notFound.join(', ')}`);
-                if (dispatched.length) detailMsg.push(`Ya despachadas: ${dispatched.join(', ')}`);
-                msg.textContent = `⚠️ ${detailMsg.join(' | ')}`;
-                msg.classList.remove('hidden');
-            } else {
-                badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/50";
-                badge.textContent = `✅ ${valid.length} Válida(s)`;
-                msg.className = "text-[11px] mt-1 text-emerald-400";
-                msg.textContent = `✅ ${valid.length} serie(s) lista(s) para despacho`;
-                msg.classList.remove('hidden');
-            }
-        }
-
-        function handleSelectPendingOrder(idx) {
-            if (idx === "" || idx === null || idx === undefined) return;
             
-            const selected = db.pendingOrders[idx];
-            if (!selected) return;
-
-            document.getElementById('ws-order-number').value = selected.orderNum || '';
-            document.getElementById('ws-agency').value = selected.agency || 'Agencia Sin Especificar';
-
-            ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => {
-                const input = document.getElementById(`ws-serie-${type}`);
-                if (input) input.value = '';
-            });
-
-            if (selected.series && selected.series.length > 0) {
-                selected.series.forEach(item => {
-                    const inputId = `ws-serie-${item.tipo}`;
-                    const inputEl = document.getElementById(inputId);
-                    
-                    if (inputEl && item.serie) {
-                        if (inputEl.value) {
-                            inputEl.value += `, ${item.serie}`;
-                        } else {
-                            inputEl.value = item.serie;
+            // 2. Try partial substring match
+            for (const field of possibleFields) {
+                const targetClean = field.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (targetClean.length < 3) continue;
+                for (const k of keys) {
+                    const keyClean = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (keyClean.includes(targetClean)) {
+                        const val = row[k];
+                        if (val !== undefined && val !== null && String(val).trim() !== '') {
+                            return String(val).trim();
                         }
                     }
-                });
-            }
-
-            ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => validateFieldLive(type));
-            showToast(`Pedido ${selected.orderNum} cargado con ${selected.series ? selected.series.length : 0} series.`, 'info');
-        }
-
-        function renderPendingOrdersDropdown() {
-            const select = document.getElementById('ws-select-pending-order');
-            select.innerHTML = '<option value="">-- Seleccionar Pedido Cargado (Auto-completa Pedido y Agencia) --</option>';
-
-            db.pendingOrders.forEach((p, idx) => {
-                const opt = document.createElement('option');
-                opt.value = idx;
-                const totalSeries = p.series ? p.series.length : 0;
-                opt.textContent = `${p.orderNum} — ${p.agency} [Series asociadas: ${totalSeries}]`;
-                select.appendChild(opt);
-            });
-
-            const badge = document.getElementById('pending-orders-count-badge');
-            if (badge) badge.textContent = `${db.pendingOrders.length} Pedidos Pendientes`;
-        }
-
-        function handleDispatchSubmit(e) {
-            e.preventDefault();
-            const orderNum = document.getElementById('ws-order-number').value.trim();
-            const agency = document.getElementById('ws-agency').value.trim();
-            const eqSerie = document.getElementById('ws-serie-equipo').value.trim();
-            const simSerie = document.getElementById('ws-serie-sim').value.trim();
-            const esimSerie = document.getElementById('ws-serie-esim').value.trim();
-            const pubSerie = document.getElementById('ws-serie-publicidad').value.trim();
-            const peso = document.getElementById('ws-peso').value.trim();
-            const guiaCnt = document.getElementById('ws-guia-cnt').value.trim();
-            const guiaCourier = document.getElementById('ws-guia-courier').value.trim();
-            const salidaSap = document.getElementById('ws-salida-sap').value.trim();
-
-            if (!activeOperator || activeOperator === 'Sin Registrar') {
-                pendingSubmitAfterOperator = true;
-                showToast('Por favor ingrese el nombre del Operario para confirmar el despacho.', 'warning');
-                openOperatorModal();
-                return;
-            }
-
-            const orderData = {
-                orderNum, agency, peso, guiaCnt, guiaCourier, salidaSap,
-                series: { eqSerie, simSerie, esimSerie, pubSerie },
-                operator: activeOperator,
-                date: new Date().toLocaleString('es-EC')
-            };
-
-            const categories = [
-                { type: 'equipos', input: eqSerie },
-                { type: 'sim', input: simSerie },
-                { type: 'esim', input: esimSerie },
-                { type: 'publicidad', input: pubSerie }
-            ];
-
-            categories.forEach(({ type, input }) => {
-                if (input) {
-                    const list = input.split(',').map(s => s.trim()).filter(Boolean);
-                    list.forEach(serie => {
-                        let item = db[type].find(i => i.serie === serie);
-                        if (item) {
-                            item.status = 'Despachado';
-                            item.assignedOrder = orderNum;
-                        } else {
-                            db[type].push({
-                                serie, detail: 'Registro al Despacho',
-                                status: 'Despachado', assignedOrder: orderNum, date: new Date().toLocaleDateString('es-EC')
-                            });
-                        }
-                    });
                 }
-            });
-
-            db.orders.unshift(orderData);
-            db.pendingOrders = db.pendingOrders.filter(p => p.orderNum !== orderNum);
-
-            saveLocalStorage();
-            updateStats();
-            renderPendingOrdersDropdown();
-            renderOrdersTable();
-            renderCategoryTable();
-            logAuditEvent('Despacho Completado', `Pedido ${orderNum} registrado para la agencia ${agency}.`);
-
-            showToast(`✅ Pedido ${orderNum} guardado y despachado exitosamente.`, 'success');
-            resetWorkstationForm();
-        }
-
-        function resetWorkstationForm() {
-            document.getElementById('form-workstation').reset();
-            ['equipo', 'sim', 'esim', 'publicidad'].forEach(type => {
-                const badge = document.getElementById(`badge-ws-${type}`);
-                if (badge) {
-                    badge.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
-                    badge.textContent = "Sin Validar";
-                }
-                const msg = document.getElementById(`msg-ws-${type}`);
-                if (msg) msg.classList.add('hidden');
-            });
+            }
+            
+            return '';
         }
 
         function handleFileUpload(e) {
@@ -1273,28 +835,40 @@
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
                     const json = XLSX.utils.sheet_to_json(sheet);
 
+                    if (!json || json.length === 0) {
+                        showToast('El archivo cargado está vacío o no tiene formato válido.', 'warning');
+                        return;
+                    }
+
                     pendingImportData = json;
                     document.getElementById('import-preview-content').textContent = JSON.stringify(json.slice(0, 5), null, 2) + `\n... y ${json.length > 5 ? json.length - 5 : 0} filas más.`;
                     document.getElementById('import-preview').classList.remove('hidden');
-                    showToast(`Archivo cargado con ${json.length} filas para revisión.`, 'info');
+                    showToast(`Archivo cargado con ${json.length} filas listas para importar.`, 'info');
                 } catch (err) {
-                    showToast('Error al leer el archivo Excel.', 'error');
+                    console.error("Error al leer archivo:", err);
+                    showToast('Error al procesar el archivo Excel.', 'error');
                 }
             };
             reader.readAsArrayBuffer(file);
         }
 
         function confirmImport() {
-            if (!pendingImportData) return;
+            if (!pendingImportData || !Array.isArray(pendingImportData) || pendingImportData.length === 0) {
+                showToast('No hay datos válidos para importar.', 'warning');
+                return;
+            }
+
             const target = document.querySelector('input[name="import-target"]:checked').value;
 
             if (target === 'pedidos') {
                 let countNew = 0;
+                let countUpdated = 0;
+
                 pendingImportData.forEach(r => {
-                    const orderNum = String(r.orderNum || r.pedido || r.PEDIDO || '').trim();
-                    const agency = String(r.agency || r.agencia || r.AGENCIA || '').trim();
-                    const serie = String(r.serie || r.SERIE || r.imei || r.IMEI || r.iccid || '').trim();
-                    let tipo = String(r.tipo || r.TIPO || 'equipo').toLowerCase().trim();
+                    const orderNum = extractRowField(r, ['orderNum', 'pedido', 'orden', 'numero', 'order', 'num']);
+                    const agency = extractRowField(r, ['agency', 'agencia', 'destino', 'sucursal', 'oficina']);
+                    const serie = extractRowField(r, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial']);
+                    let tipo = extractRowField(r, ['tipo', 'type', 'categoria', 'cat']).toLowerCase();
 
                     if (!['equipo', 'sim', 'esim', 'publicidad'].includes(tipo)) {
                         tipo = 'equipo';
@@ -1306,7 +880,10 @@
 
                     if (existingOrder) {
                         if (agency) existingOrder.agency = agency;
-                        if (serie) existingOrder.series.push({ serie, tipo });
+                        if (serie && !existingOrder.series.some(s => s.serie === serie)) {
+                            existingOrder.series.push({ serie, tipo });
+                        }
+                        countUpdated++;
                     } else {
                         db.pendingOrders.push({
                             orderNum,
@@ -1316,103 +893,122 @@
                         countNew++;
                     }
                 });
+
                 renderPendingOrdersDropdown();
-                showToast(`Se importaron/actualizaron los pedidos con sus series asociadas.`, 'success');
+                showToast(`Se cargaron ${countNew} pedidos nuevos y se actualizaron ${countUpdated}.`, 'success');
             } else {
                 let imported = 0;
                 pendingImportData.forEach(r => {
-                    const serie = String(r.serie || r.SERIE || r.imei || r.IMEI || r.iccid || '').trim();
-                    const detail = r.detail || r.detalle || r.DETALLE || r.modelo || '';
+                    let serie = extractRowField(r, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial', 'id', 'barcode']);
+                    
+                    // Fallback to first non-empty cell if header name didn't match
+                    if (!serie) {
+                        const vals = Object.values(r).map(v => v !== undefined && v !== null ? String(v).trim() : '').filter(Boolean);
+                        if (vals.length > 0) serie = vals[0];
+                    }
+
+                    let detail = extractRowField(r, ['detail', 'detalle', 'modelo', 'descripcion', 'nombre', 'equipo', 'pack', 'material']);
+                    if (!detail) {
+                        const vals = Object.values(r).map(v => v !== undefined && v !== null ? String(v).trim() : '').filter(Boolean);
+                        if (vals.length > 1 && vals[0] === serie) detail = vals[1];
+                    }
+
                     if (serie) {
-                        db[target].push({ serie, detail, status: 'Disponible', date: new Date().toLocaleDateString('es-EC') });
-                        imported++;
+                        const exists = db[target].some(item => item.serie === serie);
+                        if (!exists) {
+                            db[target].push({
+                                serie,
+                                detail: detail || 'Carga Masiva Excel',
+                                status: 'Disponible',
+                                date: new Date().toLocaleDateString('es-EC')
+                            });
+                            imported++;
+                        }
                     }
                 });
-                showToast(`Importadas ${imported} series a la categoría ${target.toUpperCase()}.`, 'success');
+                renderCategoryTable();
+                showToast(`Se importaron ${imported} series nuevas a ${target.toUpperCase()}.`, 'success');
             }
 
             saveLocalStorage();
             updateStats();
-            logAuditEvent('Carga Masiva', `Se procesaron ${pendingImportData.length} registros en ${target}`);
+            logAuditEvent('Carga Masiva', `Se procesaron ${pendingImportData.length} filas en la categoría ${target}`);
             document.getElementById('import-preview').classList.add('hidden');
             pendingImportData = null;
         }
 
-        function runGlobalValidation() {
-            const query = document.getElementById('validator-input').value.trim();
-            const resultCard = document.getElementById('validator-result');
-            if (!query) return;
-
-            let match = null;
-            let catName = '';
-
-            for (let cat of ['equipos', 'sim', 'esim', 'publicidad']) {
-                let found = db[cat].find(i => i.serie === query);
-                if (found) {
-                    match = found;
-                    catName = cat.toUpperCase();
-                    break;
-                }
-            }
-
-            resultCard.classList.remove('hidden');
-            if (match) {
-                const isAvail = match.status !== 'Despachado';
-                resultCard.className = `p-6 rounded-xl border ${isAvail ? 'bg-emerald-950/20 border-emerald-800/60' : 'bg-rose-950/20 border-rose-800/60'}`;
-                resultCard.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded bg-slate-800 text-slate-300">${catName}</span>
-                            <h3 class="text-xl font-mono font-bold text-white mt-2">${match.serie}</h3>
-                            <p class="text-xs text-slate-400 mt-1">Detalle: ${match.detail || 'Sin Descripción'}</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-sm font-bold ${isAvail ? 'text-emerald-400' : 'text-rose-400'}">${match.status || 'Disponible'}</span>
-                            ${match.assignedOrder ? `<p class="text-xs text-slate-400 mt-1">Pedido: <strong class="text-indigo-400">${match.assignedOrder}</strong></p>` : ''}
-                        </div>
-                    </div>
-                `;
-            } else {
-                resultCard.className = "p-6 rounded-xl border bg-slate-950 border-slate-800 text-center";
-                resultCard.innerHTML = `<p class="text-sm text-slate-400"><i class="fa-solid fa-circle-question mr-2 text-amber-400"></i>Serie no encontrada en la base de datos.</p>`;
-            }
-        }
-
-        function renderCategoryTable() {
-            const tbody = document.getElementById('inventory-table-body');
-            const filterInput = document.getElementById('inventory-search');
-            const filter = filterInput ? filterInput.value.toLowerCase() : '';
-            tbody.innerHTML = '';
-
-            let list = db[currentCategoryView] || [];
-            if (filter) {
-                list = list.filter(i => i.serie.toLowerCase().includes(filter) || (i.detail && i.detail.toLowerCase().includes(filter)));
-            }
-
-            document.getElementById('cat-count-badge').textContent = `${list.length} Registros`;
-
-            if (list.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay registros en esta categoría.</td></tr>`;
+        function deleteSelectedPendingOrder() {
+            const select = document.getElementById('ws-select-pending-order');
+            const idx = select.value;
+            if (idx === "" || idx === null || idx === undefined) {
+                showToast('Seleccione un pedido pendiente de la lista para borrar.', 'warning');
                 return;
             }
 
-            list.forEach((item, index) => {
-                const isAvail = item.status !== 'Despachado';
+            const order = db.pendingOrders[idx];
+            if (!order) return;
+
+            showConfirmDialog(`¿Está seguro de eliminar el pedido pendiente #${order.orderNum} (${order.agency})?`, () => {
+                db.pendingOrders.splice(idx, 1);
+                saveLocalStorage();
+                updateStats();
+                renderPendingOrdersDropdown();
+                resetWorkstationForm();
+                logAuditEvent('Eliminación de Pedido', `Se eliminó el pedido pendiente #${order.orderNum}`);
+                showToast(`Pedido pendiente #${order.orderNum} eliminado.`, 'info');
+            });
+        }
+
+        function confirmDeleteDispatchedOrder(orderNum) {
+            showConfirmDialog(`¿Está seguro de eliminar el pedido despachado #${orderNum}? Sus series vinculadas volverán a estar Disponibles.`, () => {
+                const orderIdx = db.orders.findIndex(o => o.orderNum === orderNum);
+                if (orderIdx !== -1) {
+                    // Release assigned series back to Available
+                    ['equipos', 'sim', 'esim', 'publicidad'].forEach(cat => {
+                        db[cat].forEach(item => {
+                            if (item.assignedOrder === orderNum) {
+                                item.status = 'Disponible';
+                                item.assignedOrder = '';
+                            }
+                        });
+                    });
+
+                    db.orders.splice(orderIdx, 1);
+                    saveLocalStorage();
+                    updateStats();
+                    renderOrdersTable();
+                    renderCategoryTable();
+                    logAuditEvent('Eliminación de Despacho', `Se eliminó el despacho #${orderNum} y sus series fueron liberadas.`);
+                    showToast(`Pedido #${orderNum} eliminado y series liberadas.`, 'success');
+                }
+            });
+        }
+
+        function renderOrdersTable() {
+            const tbody = document.getElementById('orders-table-body');
+            tbody.innerHTML = '';
+
+            if (db.orders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-500">No hay pedidos despachados registrados.</td></tr>`;
+                return;
+            }
+
+            db.orders.forEach(o => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-800/40 transition";
                 tr.innerHTML = `
-                    <td class="p-3 font-mono font-semibold text-slate-200">${item.serie}</td>
-                    <td class="p-3 uppercase text-[10px] text-slate-400">${currentCategoryView}</td>
-                    <td class="p-3 text-slate-300">${item.detail || 'N/A'}</td>
-                    <td class="p-3">
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${isAvail ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/50' : 'bg-rose-950 text-rose-400 border border-rose-800/50'}">
-                            ${item.status || 'Disponible'}
-                        </span>
+                    <td class="p-3 font-bold text-indigo-400 font-mono">${o.orderNum}</td>
+                    <td class="p-3 text-slate-200">${o.agency}</td>
+                    <td class="p-3 font-mono text-slate-400">${o.guiaCnt || '-'} / ${o.guiaCourier || '-'}</td>
+                    <td class="p-3 font-mono text-slate-300">${o.salidaSap || '-'}</td>
+                    <td class="p-3 text-slate-300">${o.peso ? o.peso + ' Kg' : '-'}</td>
+                    <td class="p-3 text-[11px] text-slate-400 font-mono">
+                        Eq: ${o.series?.eqSerie || '-'} | SIM: ${o.series?.simSerie || '-'}
                     </td>
-                    <td class="p-3 font-mono text-slate-400">${item.assignedOrder || '---'}</td>
-                    <td class="p-3 text-slate-500 text-[11px]">${item.date || '---'}</td>
+                    <td class="p-3 text-slate-300">${o.operator}</td>
+                    <td class="p-3 text-slate-500 text-[11px]">${o.date}</td>
                     <td class="p-3 text-right">
-                        <button onclick="confirmDeleteInventoryItem('${currentCategoryView}', ${index})" class="text-slate-500 hover:text-rose-400 transition">
+                        <button onclick="confirmDeleteDispatchedOrder('${o.orderNum}')" title="Eliminar pedido despachado y liberar series" class="text-slate-500 hover:text-rose-400 transition p-1">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </td>
