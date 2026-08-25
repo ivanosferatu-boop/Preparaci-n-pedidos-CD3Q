@@ -1231,7 +1231,6 @@
             showToast(`Operario guardado como: ${activeOperator}`, 'success');
         }
 
-        // --- STREAMING_CHUNK:Pending Orders and Dispatch logic... ---
         function openNewOrderModal() { document.getElementById('modal-new-order').classList.remove('hidden'); }
         function closeNewOrderModal() { document.getElementById('modal-new-order').classList.add('hidden'); }
         function saveNewPendingOrder() {
@@ -1305,7 +1304,6 @@
 
         function validateFieldLive(fieldKey) {
             const input = document.getElementById(`ws-serie-${fieldKey}`);
-            const badge = document.getElementById(`badge-ws-equipo`);
             const targetBadge = document.getElementById(`badge-ws-${fieldKey}`);
             const msg = document.getElementById(`msg-ws-${fieldKey}`);
 
@@ -1440,7 +1438,6 @@
             });
         }
 
-        // --- STREAMING_CHUNK:Global Search Validator function... ---
         function runGlobalValidation() {
             const query = document.getElementById('validator-input').value.trim();
             const container = document.getElementById('validator-result');
@@ -1495,7 +1492,6 @@
             container.innerHTML = html;
         }
 
-        // --- STREAMING_CHUNK:Inventory Table and Category rendering... ---
         function renderCategoryTable() {
             const tbody = document.getElementById('inventory-table-body');
             const searchVal = document.getElementById('inventory-search').value.toLowerCase().trim();
@@ -1541,7 +1537,6 @@
             });
         }
 
-        // --- STREAMING_CHUNK:Firebase Sync and Diagnostics Modal setup... ---
         function updateFirebaseStatusUI() {
             const dot = document.getElementById('sync-status-dot');
             const text = document.getElementById('sync-status-text');
@@ -1623,7 +1618,6 @@
             document.getElementById('modal-firebase-help').classList.add('hidden');
         }
 
-        // --- STREAMING_CHUNK:App Onload Initialization... ---
         window.onload = function() {
             loadLocalStorage();
             
@@ -1637,7 +1631,6 @@
             renderAuditLog();
             updateFirebaseStatusUI();
 
-            // Try Firebase Cloud State sync if available
             if (window.firebaseServices && window.firebaseSyncEnabled) {
                 window.firebaseServices.subscribeToState(
                     (cloudData) => {
