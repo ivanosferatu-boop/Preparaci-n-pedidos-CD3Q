@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CNT - Sistema de Inventario y Control de Despachos</title>
-
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -24,12 +23,10 @@
             }
         };
     </script>
-
     <!-- Firebase SDK Modular Setup -->
     <script type="module">
         import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, onSnapshot, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
         const defaultFirebaseConfig = {
             apiKey: "AIzaSyBUYs6yfnAJ3IuDzd9u3K0F0T74dxLnl1Q",
             authDomain: "preparacion-cd3q.firebaseapp.com",
@@ -38,14 +35,11 @@
             messagingSenderId: "669973043687",
             appId: "1:669973043687:web:8542cd541f414c2d718542"
         };
-
         const savedConfig = localStorage.getItem('cnt_firebase_config');
         const firebaseConfig = savedConfig ? JSON.parse(savedConfig) : defaultFirebaseConfig;
         const syncEnabled = localStorage.getItem('cnt_firebase_enabled') === 'true';
-
         window.firebaseConfig = firebaseConfig;
         window.firebaseSyncEnabled = syncEnabled;
-
         let dbInstance = null;
         if (syncEnabled) {
             try {
@@ -59,7 +53,6 @@
         } else {
             window.firebaseDb = null;
         }
-
         window.firebaseServices = {
             subscribeToState: function(onSuccess, onError) {
                 if (!dbInstance || !window.firebaseSyncEnabled) return null;
@@ -96,13 +89,10 @@
             }
         };
     </script>
-
     <!-- FontAwesome CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <!-- SheetJS CDN for Excel import/export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -114,10 +104,8 @@
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
-
     <!-- Toast Notification Overlay Container -->
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
-
     <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             
@@ -134,7 +122,6 @@
                     <p class="text-xs text-slate-400">Corporación Nacional de Telecomunicaciones</p>
                 </div>
             </div>
-
             <!-- Operator & Connection Status Indicator -->
             <div class="flex items-center space-x-3">
                 <button id="sync-status" onclick="openFirebaseHelpModal()" class="flex items-center text-xs text-slate-300 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-800 transition cursor-pointer" title="Haga clic para ver diagnósticos de conexión / configuración">
@@ -142,7 +129,6 @@
                     <span id="sync-status-text">Modo Local (Autónomo)</span>
                     <i class="fa-solid fa-circle-info ml-2 text-slate-500 text-[11px]"></i>
                 </button>
-
                 <button onclick="openOperatorModal()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-200 transition">
                     <i class="fa-solid fa-user-check text-indigo-400"></i>
                     <span class="text-slate-400 hidden sm:inline">Operario:</span>
@@ -151,9 +137,7 @@
             </div>
         </div>
     </header>
-
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
         <!-- KPI Metrics Grid -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
@@ -165,7 +149,6 @@
                     <i class="fa-solid fa-mobile-screen-button"></i>
                 </div>
             </div>
-
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-slate-400">SIM Cards</p>
@@ -175,7 +158,6 @@
                     <i class="fa-solid fa-sim-card"></i>
                 </div>
             </div>
-
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-slate-400">eSIMs Activas</p>
@@ -185,7 +167,6 @@
                     <i class="fa-solid fa-qrcode"></i>
                 </div>
             </div>
-
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-slate-400">Pedidos Procesados</p>
@@ -196,7 +177,6 @@
                 </div>
             </div>
         </div>
-
         <nav class="flex space-x-2 border-b border-slate-800 overflow-x-auto pb-1">
             <button id="tab-btn-workstation" onclick="switchTab('workstation')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition">
                 <i class="fa-solid fa-cash-register"></i>
@@ -223,7 +203,6 @@
                 <span>Bitácora de Control</span>
             </button>
         </nav>
-
         <section id="view-workstation" class="tab-content space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 
@@ -239,7 +218,6 @@
                         0 Pedidos Pendientes
                     </span>
                 </div>
-
                 <form id="form-workstation" onsubmit="handleDispatchSubmit(event)" class="space-y-6">
                     
                     <!-- Pre-loaded Orders Dropdown -->
@@ -262,7 +240,6 @@
                             </button>
                         </div>
                     </div>
-
                     <!-- Primary Order Identification & Destination -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -280,14 +257,12 @@
                             </div>
                         </div>
                     </div>
-
                     <!-- Series Scanning & Validation Grid -->
                     <div class="border-t border-slate-800/80 pt-4">
                         <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
                             <i class="fa-solid fa-microchip text-slate-500"></i>
                             Series y Materiales Asignados (Admite múltiples series por pedido)
                         </h3>
-
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <!-- Equipo / IMEI -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
@@ -301,7 +276,6 @@
                                 <input type="text" id="ws-serie-equipo" oninput="validateFieldLive('equipo')" placeholder="Escanear IMEI o series separadas por comas..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-blue-500">
                                 <p id="msg-ws-equipo" class="text-[11px] hidden"></p>
                             </div>
-
                             <!-- SIM Card ICCID -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
                                 <div class="flex items-center justify-between">
@@ -314,7 +288,6 @@
                                 <input type="text" id="ws-serie-sim" oninput="validateFieldLive('sim')" placeholder="Escanear ICCID o series separadas por comas..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-cyan-500">
                                 <p id="msg-ws-sim" class="text-[11px] hidden"></p>
                             </div>
-
                             <!-- eSIM Serial -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
                                 <div class="flex items-center justify-between">
@@ -327,7 +300,6 @@
                                 <input type="text" id="ws-serie-esim" oninput="validateFieldLive('esim')" placeholder="Escanear código eSIM o vouchers..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
                                 <p id="msg-ws-esim" class="text-[11px] hidden"></p>
                             </div>
-
                             <!-- Material Publicitario -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
                                 <div class="flex items-center justify-between">
@@ -342,14 +314,12 @@
                             </div>
                         </div>
                     </div>
-
                     <!-- Logistics & Transport Details -->
                     <div class="border-t border-slate-800/80 pt-4 space-y-4">
                         <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                             <i class="fa-solid fa-truck-fast text-slate-500"></i>
                             Datos de Pesaje y Despacho Logístico
                         </h3>
-
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-xs font-medium text-slate-400 mb-1">Peso Paquete (Kg)</label>
@@ -369,7 +339,6 @@
                             </div>
                         </div>
                     </div>
-
                     <!-- Submission Controls -->
                     <div class="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div class="text-xs text-slate-400">
@@ -385,11 +354,9 @@
                             </button>
                         </div>
                     </div>
-
                 </form>
             </div>
         </section>
-
         <section id="view-validator" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="border-b border-slate-800 pb-4">
@@ -399,18 +366,15 @@
                     </h2>
                     <p class="text-xs text-slate-400">Consulte el estado, disponibilidad y trazabilidad de cualquier IMEI, ICCID o Serie en el sistema.</p>
                 </div>
-
                 <div class="flex gap-3 max-w-xl">
                     <input type="text" id="validator-input" placeholder="Ingrese IMEI, ICCID o Serie a consultar..." onkeyup="if(event.key==='Enter') runGlobalValidation()" class="flex-grow px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-indigo-500">
                     <button onclick="runGlobalValidation()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-5 py-2.5 rounded-xl text-xs transition">
                         Buscar Serie
                     </button>
                 </div>
-
                 <div id="validator-result" class="hidden"></div>
             </div>
         </section>
-
         <section id="view-inventory" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 
@@ -421,7 +385,6 @@
                         <button id="cat-btn-esim" onclick="switchCategory('esim')" class="cat-btn pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">🌐 eSIMs</button>
                         <button id="cat-btn-publicidad" onclick="switchCategory('publicidad')" class="cat-btn pb-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200">📣 Publicidad</button>
                     </div>
-
                     <div class="flex items-center space-x-2">
                         <span id="cat-count-badge" class="text-xs px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 font-mono">0 Registros</span>
                         <button onclick="openAddItemModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
@@ -432,11 +395,9 @@
                         </button>
                     </div>
                 </div>
-
                 <div class="max-w-xs">
                     <input type="text" id="inventory-search" onkeyup="renderCategoryTable()" placeholder="Filtrar por serie o detalle..." class="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
                 </div>
-
                 <div class="overflow-x-auto rounded-xl border border-slate-800">
                     <table class="w-full text-left text-xs text-slate-300">
                         <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
@@ -457,7 +418,6 @@
                 </div>
             </div>
         </section>
-
         <section id="view-orders" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -472,7 +432,6 @@
                         <i class="fa-solid fa-file-excel text-emerald-400"></i> Exportar Despachos
                     </button>
                 </div>
-
                 <div class="overflow-x-auto rounded-xl border border-slate-800">
                     <table class="w-full text-left text-xs text-slate-300">
                         <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
@@ -495,7 +454,6 @@
                 </div>
             </div>
         </section>
-
         <section id="view-import" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="border-b border-slate-800 pb-4">
@@ -505,7 +463,6 @@
                     </h2>
                     <p class="text-xs text-slate-400">Importe múltiples series de equipos, SIMs o pedidos asignados ordenados por agencia.</p>
                 </div>
-
                 <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     <label class="cursor-pointer">
                         <input type="radio" name="import-target" value="equipos" checked class="peer sr-only">
@@ -543,13 +500,12 @@
                         </div>
                     </label>
                 </div>
-
                 <div class="border-2 border-dashed border-slate-700 hover:border-emerald-500/50 rounded-2xl p-8 text-center bg-slate-950/50 transition">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-600 mb-3"></i>
                     <p class="text-sm font-medium text-slate-300 mb-1">Arrastre su archivo Excel (.xlsx) o CSV aquí</p>
                     <p class="text-xs text-slate-500 mb-4">
                         Para pedidos y agencias, se recomiendan las columnas: 
-                        <code class="text-indigo-400">pedido</code>, <code class="text-indigo-400">agencia</code>, <code class="text-indigo-400">serie</code>, <code class="text-indigo-400">tipo</code>
+                        <code class="text-indigo-400">Pedido SAP</code>, <code class="text-indigo-400">Descripción Bodega</code>, <code class="text-indigo-400">Serie</code>, <code class="text-indigo-400">Descripción</code>
                     </p>
                     
                     <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
@@ -557,7 +513,6 @@
                         Seleccionar Archivo Local
                     </button>
                 </div>
-
                 <div id="import-preview" class="hidden space-y-3">
                     <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Previsualización de Carga</h4>
                     <div id="import-preview-content" class="text-xs text-slate-400 bg-slate-950 p-4 rounded-xl max-h-40 overflow-y-auto font-mono"></div>
@@ -565,7 +520,6 @@
                 </div>
             </div>
         </section>
-
         <section id="view-audit" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -577,7 +531,6 @@
                         <p class="text-xs text-slate-400">Auditoría en tiempo real de operaciones, desvinculaciones y despachos realizados.</p>
                     </div>
                 </div>
-
                 <div class="overflow-x-auto rounded-xl border border-slate-800">
                     <table class="w-full text-left text-xs text-slate-300">
                         <thead class="bg-slate-950 text-slate-400 uppercase font-semibold text-[11px] border-b border-slate-800">
@@ -595,9 +548,7 @@
                 </div>
             </div>
         </section>
-
     </main>
-
     <!-- Modal: Confirm Action -->
     <div id="modal-confirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
@@ -616,7 +567,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Register Operator -->
     <div id="modal-operator" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -631,7 +581,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Generar Nuevo Pedido Pendiente -->
     <div id="modal-new-order" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -659,7 +608,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Add Item to Inventory -->
     <div id="modal-add-item" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -691,7 +639,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Firebase Help & Status / Config Settings -->
     <div id="modal-firebase-help" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xl shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -701,14 +648,12 @@
                 </h3>
                 <button onclick="closeFirebaseHelpModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
-
             <!-- Diagnostics Box -->
             <div class="space-y-4 text-xs text-slate-300">
                 <div>
                     <p class="font-semibold text-slate-200 mb-1">📊 Estado Actual del Conector:</p>
                     <div id="firebase-status-details" class="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] leading-relaxed text-amber-300"></div>
                 </div>
-
                 <!-- Cloud Sync Toggle Button -->
                 <div class="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 flex items-center justify-between gap-4">
                     <div>
@@ -719,7 +664,6 @@
                         Cargando...
                     </button>
                 </div>
-
                 <!-- Custom Firebase Credentials Form -->
                 <div class="border-t border-slate-800 pt-3 space-y-3">
                     <p class="font-semibold text-slate-200 flex items-center gap-1.5">
@@ -749,7 +693,6 @@
                     </button>
                 </div>
             </div>
-
             <div class="flex justify-end pt-2 border-t border-slate-800">
                 <button onclick="closeFirebaseHelpModal()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition">
                     Entendido
@@ -757,7 +700,6 @@
             </div>
         </div>
     </div>
-
     <script>
         // Global Application Database & State
         let db = {
@@ -769,11 +711,9 @@
             pendingOrders: [],
             audit: []
         };
-
         let activeOperator = localStorage.getItem('cnt_operator') || 'Operario General';
         let currentCategoryView = 'equipos';
         let pendingImportData = null;
-
         function loadLocalStorage() {
             const data = localStorage.getItem('cnt_inventory_db');
             if (data) {
@@ -793,31 +733,26 @@
                 }
             }
         }
-
         function saveLocalStorage(syncToCloud = true) {
             localStorage.setItem('cnt_inventory_db', JSON.stringify(db));
             if (syncToCloud) {
                 syncToFirebaseCloud();
             }
         }
-
         function updateStats() {
             const eqAvail = (db.equipos || []).filter(i => i.status !== 'Despachado').length;
             const simAvail = (db.sim || []).filter(i => i.status !== 'Despachado').length;
             const esimAvail = (db.esim || []).filter(i => i.status !== 'Despachado').length;
             const ordersCount = (db.orders || []).length;
-
             const elEq = document.getElementById('stat-equipos');
             const elSim = document.getElementById('stat-sims');
             const elEsim = document.getElementById('stat-esims');
             const elPed = document.getElementById('stat-pedidos');
-
             if (elEq) elEq.textContent = eqAvail;
             if (elSim) elSim.textContent = simAvail;
             if (elEsim) elEsim.textContent = esimAvail;
             if (elPed) elPed.textContent = ordersCount;
         }
-
         function logAuditEvent(action, detail) {
             if (!db.audit) db.audit = [];
             db.audit.unshift({
@@ -830,18 +765,15 @@
             saveLocalStorage(true);
             renderAuditLog();
         }
-
         function renderAuditLog() {
             const tbody = document.getElementById('audit-table-body');
             if (!tbody) return;
             tbody.innerHTML = '';
-
             const list = db.audit || [];
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-500">No hay eventos registrados en la bitácora.</td></tr>`;
                 return;
             }
-
             list.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-800/40 transition";
@@ -854,22 +786,18 @@
                 tbody.appendChild(tr);
             });
         }
-
         function renderOrdersTable() {
             const tbody = document.getElementById('orders-table-body');
             if (!tbody) return;
             tbody.innerHTML = '';
-
             const list = db.orders || [];
             if (list.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-500">No hay despachos registrados hasta la fecha.</td></tr>`;
                 return;
             }
-
             list.forEach((order, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-800/40 transition";
-
                 const seriesList = [];
                 if (order.series) {
                     if (order.series.eqSerie) seriesList.push(`Eq: ${order.series.eqSerie}`);
@@ -877,7 +805,6 @@
                     if (order.series.esimSerie) seriesList.push(`eSIM: ${order.series.esimSerie}`);
                     if (order.series.pubSerie) seriesList.push(`Pub: ${order.series.pubSerie}`);
                 }
-
                 tr.innerHTML = `
                     <td class="p-3 font-mono text-indigo-400 font-bold">#${order.orderNum}</td>
                     <td class="p-3 font-medium text-slate-200">${order.agency}</td>
@@ -900,7 +827,6 @@
                 tbody.appendChild(tr);
             });
         }
-
         function deleteOrder(index) {
             showConfirmDialog('¿Está seguro de eliminar este registro de despacho?', () => {
                 const removed = db.orders.splice(index, 1)[0];
@@ -911,7 +837,6 @@
                 showToast('Registro de despacho eliminado.', 'info');
             });
         }
-
         function deleteSelectedPendingOrder() {
             const select = document.getElementById('ws-select-pending-order');
             const val = select.value;
@@ -928,32 +853,25 @@
                 showToast('Pedido pendiente eliminado.', 'info');
             });
         }
-
         function openAddItemModal() {
             document.getElementById('modal-add-item').classList.remove('hidden');
         }
-
         function closeAddItemModal() {
             document.getElementById('modal-add-item').classList.add('hidden');
         }
-
         function saveSingleItem() {
             const category = document.getElementById('add-item-category').value;
             const serie = document.getElementById('add-item-serie').value.trim();
             const detail = document.getElementById('add-item-detail').value.trim();
-
             if (!serie) {
                 showToast('La serie / identificador es obligatorio.', 'warning');
                 return;
             }
-
             if (!db[category]) db[category] = [];
-
             if (db[category].some(i => i.serie === serie)) {
                 showToast('Esta serie ya existe en la categoría seleccionada.', 'warning');
                 return;
             }
-
             db[category].push({
                 serie: serie,
                 detail: detail,
@@ -961,7 +879,6 @@
                 assignedOrder: null,
                 date: new Date().toLocaleDateString('es-EC')
             });
-
             saveLocalStorage();
             updateStats();
             renderCategoryTable();
@@ -969,11 +886,9 @@
             
             document.getElementById('add-item-serie').value = '';
             document.getElementById('add-item-detail').value = '';
-
             logAuditEvent('Ítem Agregado', `Agregado a ${category}: ${serie}`);
             showToast(`Ítem ${serie} registrado correctamente.`, 'success');
         }
-
         function confirmDeleteInventoryItem(category, index) {
             showConfirmDialog('¿Está seguro de eliminar este ítem del inventario?', () => {
                 const removed = db[category].splice(index, 1)[0];
@@ -984,7 +899,6 @@
                 showToast('Ítem eliminado del inventario.', 'info');
             });
         }
-
         function exportInventoryToExcel() {
             if (typeof XLSX === 'undefined') {
                 showToast('Librería Excel no cargada.', 'error');
@@ -1006,7 +920,6 @@
             logAuditEvent('Exportación Excel', 'Exportado inventario completo a Excel');
             showToast('Inventario exportado a Excel.', 'success');
         }
-
         function exportOrdersToExcel() {
             if (typeof XLSX === 'undefined') {
                 showToast('Librería Excel no cargada.', 'error');
@@ -1033,11 +946,9 @@
             logAuditEvent('Exportación Excel', 'Exportado histórico de despachos a Excel');
             showToast('Despachos exportados a Excel.', 'success');
         }
-
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
@@ -1045,20 +956,16 @@
                     const workbook = XLSX.read(data, { type: 'array' });
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
-                    const json = XLSX.utils.sheet_to_json(worksheet);
-
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                     if (json.length === 0) {
                         showToast('El archivo cargado no contiene filas.', 'warning');
                         return;
                     }
-
                     pendingImportData = json;
                     const target = document.querySelector('input[name="import-target"]:checked').value;
-
                     const preview = document.getElementById('import-preview');
                     const content = document.getElementById('import-preview-content');
                     preview.classList.remove('hidden');
-
                     content.textContent = `Target: ${target.toUpperCase()} | Total filas leídas: ${json.length}\n\nPrimera(s) fila(s) de muestra:\n` + JSON.stringify(json.slice(0, 3), null, 2);
                     showToast(`Archivo procesado: ${json.length} filas listas para importar.`, 'info');
                 } catch (err) {
@@ -1067,40 +974,76 @@
             };
             reader.readAsArrayBuffer(file);
         }
-
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
                 showToast('No hay datos pendientes para importar.', 'warning');
                 return;
             }
-
             const target = document.querySelector('input[name="import-target"]:checked').value;
             let addedCount = 0;
-
             if (target === 'pedidos') {
                 pendingImportData.forEach(row => {
-                    const orderNum = String(row.pedido || row.Pedido || row.orderNum || row.orden || '').trim();
-                    const agency = String(row.agencia || row.Agencia || row.agency || '').trim();
-                    const serie = String(row.serie || row.Serie || row.imei || row.iccid || '').trim();
-                    const tipo = String(row.tipo || row.Tipo || 'equipo').trim();
+                    const orderNum = String(
+                        row['Pedido SAP'] || row['pedido'] || row['Pedido'] || row['orderNum'] || row['orden'] || ''
+                    ).trim();
+                    
+                    const agency = String(
+                        row['Descripción Bodega'] || row['agencia'] || row['Agencia'] || row['agency'] || ''
+                    ).trim();
+                    
+                    const serie = String(
+                        row['Serie'] || row['serie'] || row['imei'] || row['iccid'] || ''
+                    ).trim();
+                    
+                    const tipo = String(
+                        row['TIPO DE LOTE'] || row['tipo'] || row['Tipo'] || 'equipo'
+                    ).trim();
+                    
+                    const codigoSap = String(row['Código SAP'] || row['codigoSap'] || '').trim();
+                    const descripcion = String(row['Descripción'] || row['descripcion'] || '').trim();
+                    const tecnologia = String(row['Tecnología'] || row['tecnologia'] || '').trim();
+                    const codigoOpen = String(row['Código OPEN CNT'] || row['codigoOpen'] || '').trim();
+                    const bodegaSap = String(row['Bodega SAP'] || row['bodegaSap'] || '').trim();
+                    const bodegaOpen = String(row['Bodega Open'] || row['bodegaOpen'] || '').trim();
+                    const canal = String(row['Canal'] || row['canal'] || '').trim();
 
                     if (orderNum) {
                         let existing = db.pendingOrders.find(p => p.orderNum === orderNum);
                         if (!existing) {
-                            existing = { orderNum, agency: agency || 'Agencia General', series: [] };
+                            existing = { 
+                                orderNum, 
+                                agency: agency || 'Agencia General', 
+                                series: [],
+                                metaSap: {
+                                    codigoSap,
+                                    descripcion,
+                                    tecnologia,
+                                    codigoOpen,
+                                    bodegaSap,
+                                    bodegaOpen,
+                                    canal
+                                }
+                            };
                             db.pendingOrders.push(existing);
                         }
                         if (serie) {
-                            existing.series.push({ serie, tipo });
+                            existing.series.push({ 
+                                serie, 
+                                tipo: tipo.toLowerCase().includes('sim') ? 'sim' : 'equipo',
+                                detalleExtra: descripcion
+                            });
                         }
                         addedCount++;
                     }
                 });
             } else {
                 pendingImportData.forEach(row => {
-                    const serie = String(row.serie || row.Serie || row.imei || row.ICCID || row.iccid || row.codigo || Object.values(row)[0] || '').trim();
-                    const detail = String(row.detalle || row.Detalle || row.modelo || row.Modelo || '').trim();
-
+                    const serie = String(
+                        row['Serie'] || row['serie'] || row['imei'] || row['ICCID'] || row['iccid'] || row['codigo'] || Object.values(row)[0] || ''
+                    ).trim();
+                    const detail = String(
+                        row['Descripción'] || row['detalle'] || row['Detalle'] || row['modelo'] || row['Modelo'] || ''
+                    ).trim();
                     if (serie && !db[target].some(i => i.serie === serie)) {
                         db[target].push({
                             serie: serie,
@@ -1113,40 +1056,32 @@
                     }
                 });
             }
-
             saveLocalStorage();
             updateStats();
             renderPendingOrdersDropdown();
             renderCategoryTable();
-
             document.getElementById('import-preview').classList.add('hidden');
             pendingImportData = null;
             document.getElementById('excel-file-input').value = '';
-
             logAuditEvent('Carga Masiva', `Importados ${addedCount} registros en target: ${target}`);
             showToast(`¡Carga completada! Se importaron ${addedCount} registros.`, 'success');
         }
-
         // --- Core UI & Navigation Functions ---
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition";
             });
-
             const selectedTab = document.getElementById(`view-${tabId}`);
             const selectedBtn = document.getElementById(`tab-btn-${tabId}`);
-
             if (selectedTab) selectedTab.classList.remove('hidden');
             if (selectedBtn) {
                 selectedBtn.className = "tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition";
             }
-
             if (tabId === 'inventory') renderCategoryTable();
             if (tabId === 'orders') renderOrdersTable();
             if (tabId === 'audit') renderAuditLog();
         }
-
         function switchCategory(catId) {
             currentCategoryView = catId;
             document.querySelectorAll('.cat-btn').forEach(btn => {
@@ -1158,7 +1093,6 @@
             }
             renderCategoryTable();
         }
-
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -1169,50 +1103,41 @@
                 error: 'bg-rose-950/90 border-rose-700/60 text-rose-200',
                 info: 'bg-indigo-950/90 border-indigo-700/60 text-indigo-200'
             };
-
             const icons = {
                 success: 'fa-circle-check text-emerald-400',
                 warning: 'fa-triangle-exclamation text-amber-400',
                 error: 'fa-circle-xmark text-rose-400',
                 info: 'fa-circle-info text-indigo-400'
             };
-
             toast.className = `p-3.5 rounded-xl border backdrop-blur-md shadow-xl text-xs flex items-center gap-3 transition-all transform duration-300 translate-y-2 opacity-0 pointer-events-auto ${colors[type] || colors.info}`;
             toast.innerHTML = `
                 <i class="fa-solid ${icons[type] || icons.info} text-base"></i>
                 <span class="flex-grow font-medium leading-relaxed">${message}</span>
             `;
-
             container.appendChild(toast);
             setTimeout(() => {
                 toast.classList.remove('translate-y-2', 'opacity-0');
             }, 50);
-
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-y-2');
                 setTimeout(() => toast.remove(), 300);
             }, 4500);
         }
-
         function showConfirmDialog(message, onConfirm) {
             const modal = document.getElementById('modal-confirm');
             document.getElementById('confirm-modal-text').textContent = message;
             
             const okBtn = document.getElementById('confirm-modal-ok');
             const cancelBtn = document.getElementById('confirm-modal-cancel');
-
             const cleanup = () => {
                 modal.classList.add('hidden');
                 okBtn.onclick = null;
                 cancelBtn.onclick = null;
             };
-
             okBtn.onclick = () => { cleanup(); onConfirm(); };
             cancelBtn.onclick = () => { cleanup(); };
-
             modal.classList.remove('hidden');
         }
-
         // --- Operator Modal Logic ---
         function openOperatorModal() { document.getElementById('modal-operator').classList.remove('hidden'); }
         function closeOperatorModal() { document.getElementById('modal-operator').classList.add('hidden'); }
@@ -1230,85 +1155,68 @@
             logAuditEvent('Cambio de Operario', `Operario activo asignado: ${activeOperator}`);
             showToast(`Operario guardado como: ${activeOperator}`, 'success');
         }
-
         function openNewOrderModal() { document.getElementById('modal-new-order').classList.remove('hidden'); }
         function closeNewOrderModal() { document.getElementById('modal-new-order').classList.add('hidden'); }
         function saveNewPendingOrder() {
             const num = document.getElementById('new-order-number').value.trim();
             const agency = document.getElementById('new-order-agency').value.trim();
             const seriesInput = document.getElementById('new-order-series').value.trim();
-
             if (!num || !agency) {
                 showToast('El número de pedido y la agencia son requeridos.', 'warning');
                 return;
             }
-
             const seriesArr = seriesInput ? seriesInput.split(',').map(s => ({ serie: s.trim(), tipo: 'equipo' })).filter(s => s.serie) : [];
-
             db.pendingOrders.push({
                 orderNum: num,
                 agency: agency,
                 series: seriesArr
             });
-
             saveLocalStorage();
             updateStats();
             renderPendingOrdersDropdown();
             closeNewOrderModal();
             showToast(`Pedido #${num} registrado en lista de pendientes.`, 'success');
             logAuditEvent('Nuevo Pedido Creado', `Creado pedido pendiente #${num} para ${agency}`);
-
             document.getElementById('new-order-number').value = '';
             document.getElementById('new-order-agency').value = '';
             document.getElementById('new-order-series').value = '';
         }
-
         function renderPendingOrdersDropdown() {
             const select = document.getElementById('ws-select-pending-order');
             select.innerHTML = '<option value="">-- Seleccionar Pedido Cargado --</option>';
-
             db.pendingOrders.forEach((o, idx) => {
                 const opt = document.createElement('option');
                 opt.value = idx;
                 opt.textContent = `Pedido #${o.orderNum} - ${o.agency} (${o.series ? o.series.length : 0} series vinculadas)`;
                 select.appendChild(opt);
             });
-
             const badge = document.getElementById('pending-orders-count-badge');
             if (badge) badge.textContent = `${db.pendingOrders.length} Pedidos Pendientes`;
         }
-
         function handleSelectPendingOrder(index) {
             if (index === "" || index === null || index === undefined) return;
             const order = db.pendingOrders[index];
             if (!order) return;
-
             document.getElementById('ws-order-number').value = order.orderNum || '';
             document.getElementById('ws-agency').value = order.agency || '';
-
             if (order.series && Array.isArray(order.series)) {
                 const equipos = order.series.filter(s => s.tipo === 'equipo').map(s => s.serie).join(', ');
                 const sims = order.series.filter(s => s.tipo === 'sim').map(s => s.serie).join(', ');
                 const esims = order.series.filter(s => s.tipo === 'esim').map(s => s.serie).join(', ');
                 const publicidad = order.series.filter(s => s.tipo === 'publicidad').map(s => s.serie).join(', ');
-
                 if (equipos) document.getElementById('ws-serie-equipo').value = equipos;
                 if (sims) document.getElementById('ws-serie-sim').value = sims;
                 if (esims) document.getElementById('ws-serie-esim').value = esims;
                 if (publicidad) document.getElementById('ws-serie-publicidad').value = publicidad;
             }
-
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(validateFieldLive);
             showToast(`Pedido #${order.orderNum} auto-completado en formulario.`, 'info');
         }
-
         function validateFieldLive(fieldKey) {
             const input = document.getElementById(`ws-serie-${fieldKey}`);
             const targetBadge = document.getElementById(`badge-ws-${fieldKey}`);
             const msg = document.getElementById(`msg-ws-${fieldKey}`);
-
             if (!input || !targetBadge || !msg) return;
-
             const val = input.value.trim();
             if (!val) {
                 targetBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
@@ -1316,13 +1224,11 @@
                 msg.classList.add('hidden');
                 return;
             }
-
             const series = val.split(',').map(s => s.trim()).filter(Boolean);
             const dbCategory = fieldKey === 'equipo' ? 'equipos' : fieldKey;
             
             let allAvailable = true;
             let foundCount = 0;
-
             series.forEach(s => {
                 const item = (db[dbCategory] || []).find(i => i.serie === s);
                 if (item) {
@@ -1330,7 +1236,6 @@
                     if (item.status === 'Despachado') allAvailable = false;
                 }
             });
-
             if (foundCount === series.length && allAvailable) {
                 targetBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800";
                 targetBadge.textContent = `Validado (${series.length} OK)`;
@@ -1351,10 +1256,8 @@
                 msg.classList.remove('hidden');
             }
         }
-
         function handleDispatchSubmit(e) {
             e.preventDefault();
-
             const orderNum = document.getElementById('ws-order-number').value.trim();
             const agency = document.getElementById('ws-agency').value.trim();
             const eqSerie = document.getElementById('ws-serie-equipo').value.trim();
@@ -1365,12 +1268,10 @@
             const guiaCnt = document.getElementById('ws-guia-cnt').value.trim();
             const guiaCourier = document.getElementById('ws-guia-courier').value.trim();
             const salidaSap = document.getElementById('ws-salida-sap').value.trim();
-
             if (!orderNum || !agency) {
                 showToast('Número de Pedido y Agencia son obligatorios.', 'warning');
                 return;
             }
-
             const newDispatch = {
                 orderNum,
                 agency,
@@ -1382,9 +1283,7 @@
                 date: new Date().toLocaleString('es-EC'),
                 series: { eqSerie, simSerie, esimSerie, pubSerie }
             };
-
             db.orders.unshift(newDispatch);
-
             // Mark or register series in inventory as Dispatched
             const bindSeries = (rawStr, category) => {
                 if (!rawStr) return;
@@ -1405,29 +1304,24 @@
                     }
                 });
             };
-
             bindSeries(eqSerie, 'equipos');
             bindSeries(simSerie, 'sim');
             bindSeries(esimSerie, 'esim');
             bindSeries(pubSerie, 'publicidad');
-
             // Remove from pending list if matching
             const pendingIndex = db.pendingOrders.findIndex(p => p.orderNum === orderNum);
             if (pendingIndex !== -1) {
                 db.pendingOrders.splice(pendingIndex, 1);
             }
-
             saveLocalStorage();
             updateStats();
             renderPendingOrdersDropdown();
             renderOrdersTable();
             renderCategoryTable();
             resetWorkstationForm();
-
             logAuditEvent('Despacho Exitoso', `Registrado pedido #${orderNum} para ${agency} por ${activeOperator}`);
             showToast(`¡Pedido #${orderNum} registrado y despachado con éxito!`, 'success');
         }
-
         function resetWorkstationForm() {
             document.getElementById('form-workstation').reset();
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(f => {
@@ -1437,17 +1331,14 @@
                 if (m) m.classList.add('hidden');
             });
         }
-
         function runGlobalValidation() {
             const query = document.getElementById('validator-input').value.trim();
             const container = document.getElementById('validator-result');
             container.classList.remove('hidden');
-
             if (!query) {
                 container.innerHTML = `<div class="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400">Por favor ingrese una serie o identificador.</div>`;
                 return;
             }
-
             let matches = [];
             ['equipos', 'sim', 'esim', 'publicidad'].forEach(cat => {
                 db[cat].forEach(item => {
@@ -1456,7 +1347,6 @@
                     }
                 });
             });
-
             if (matches.length === 0) {
                 container.innerHTML = `
                     <div class="p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-300 flex items-center gap-3">
@@ -1466,7 +1356,6 @@
                 `;
                 return;
             }
-
             let html = `<div class="space-y-3">`;
             matches.forEach(m => {
                 const isDispatched = m.status === 'Despachado';
@@ -1491,31 +1380,24 @@
             html += `</div>`;
             container.innerHTML = html;
         }
-
         function renderCategoryTable() {
             const tbody = document.getElementById('inventory-table-body');
             const searchVal = document.getElementById('inventory-search').value.toLowerCase().trim();
             tbody.innerHTML = '';
-
             const list = db[currentCategoryView] || [];
             const filtered = list.filter(i => 
                 i.serie.toLowerCase().includes(searchVal) || 
                 (i.detail && i.detail.toLowerCase().includes(searchVal))
             );
-
             document.getElementById('cat-count-badge').textContent = `${filtered.length} Registros`;
-
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay registros cargados en esta categoría.</td></tr>`;
                 return;
             }
-
             filtered.forEach((item, originalIndex) => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-800/40 transition";
-
                 const isDispatched = item.status === 'Despachado';
-
                 tr.innerHTML = `
                     <td class="p-3 font-mono text-slate-100 font-semibold">${item.serie}</td>
                     <td class="p-3 capitalize text-slate-400 text-[11px]">${currentCategoryView}</td>
@@ -1536,23 +1418,19 @@
                 tbody.appendChild(tr);
             });
         }
-
         function updateFirebaseStatusUI() {
             const dot = document.getElementById('sync-status-dot');
             const text = document.getElementById('sync-status-text');
             const details = document.getElementById('firebase-status-details');
             const btn = document.getElementById('toggle-firebase-btn');
-
             const isEnabled = window.firebaseSyncEnabled;
             const isConnected = !!window.firebaseDb;
-
             if (btn) {
                 btn.className = isEnabled 
                     ? "px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900" 
                     : "px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap bg-indigo-600 text-white hover:bg-indigo-500";
                 btn.textContent = isEnabled ? "Desactivar Cloud Sync" : "Activar Cloud Sync";
             }
-
             if (!isEnabled) {
                 if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-slate-500 mr-2";
                 if (text) text.textContent = "Modo Local (Autónomo)";
@@ -1567,43 +1445,36 @@
                 if (details) details.textContent = "⚠️ Firebase configurado pero no conectado.\nBase de datos no disponible o error de red. Operando en modo local para evitar bloqueos.";
             }
         }
-
         function toggleFirebaseSyncPreference() {
             const curr = window.firebaseSyncEnabled;
             localStorage.setItem('cnt_firebase_enabled', (!curr).toString());
             showToast(!curr ? 'Sincronización Cloud ACTIVADA. Reiniciando conector...' : 'Modo Local ACTIVADO.', 'info');
             setTimeout(() => window.location.reload(), 1000);
         }
-
         function saveCustomFirebaseConfig() {
             const projectId = document.getElementById('cfg-project-id').value.trim();
             const apiKey = document.getElementById('cfg-api-key').value.trim();
             const authDomain = document.getElementById('cfg-auth-domain').value.trim();
             const storageBucket = document.getElementById('cfg-storage-bucket').value.trim();
-
             if (!projectId || !apiKey) {
                 showToast('Project ID y API Key son obligatorios.', 'warning');
                 return;
             }
-
             const newCfg = {
                 apiKey, authDomain, projectId, storageBucket,
                 messagingSenderId: "669973043687",
                 appId: "1:669973043687:web:8542cd541f414c2d718542"
             };
-
             localStorage.setItem('cnt_firebase_config', JSON.stringify(newCfg));
             localStorage.setItem('cnt_firebase_enabled', 'true');
             showToast('Configuración Firebase actualizada. Recargando...', 'success');
             setTimeout(() => window.location.reload(), 1000);
         }
-
         function syncToFirebaseCloud() {
             if (window.firebaseServices && window.firebaseSyncEnabled) {
                 window.firebaseServices.saveState(db);
             }
         }
-
         function openFirebaseHelpModal() {
             const cfg = window.firebaseConfig || {};
             document.getElementById('cfg-project-id').value = cfg.projectId || '';
@@ -1613,24 +1484,20 @@
             updateFirebaseStatusUI();
             document.getElementById('modal-firebase-help').classList.remove('hidden');
         }
-
         function closeFirebaseHelpModal() {
             document.getElementById('modal-firebase-help').classList.add('hidden');
         }
-
         window.onload = function() {
             loadLocalStorage();
             
             document.getElementById('active-operator-display').textContent = activeOperator;
             document.getElementById('form-operator-footer').textContent = activeOperator;
-
             updateStats();
             renderPendingOrdersDropdown();
             renderCategoryTable();
             renderOrdersTable();
             renderAuditLog();
             updateFirebaseStatusUI();
-
             if (window.firebaseServices && window.firebaseSyncEnabled) {
                 window.firebaseServices.subscribeToState(
                     (cloudData) => {
