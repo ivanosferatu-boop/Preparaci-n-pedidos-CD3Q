@@ -27,7 +27,7 @@
                 <div>
                     <h1 class="text-base font-bold tracking-wide flex items-center gap-2">
                         Sistema de Control de Despachos 
-                        <span class="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full font-mono">v3.5</span>
+                        <span class="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full font-mono">v3.7</span>
                     </h1>
                     <p class="text-xs text-slate-400">Corporación Nacional de Telecomunicaciones</p>
                 </div>
@@ -96,7 +96,7 @@
                 </div>
 
                 <!-- Categorías de Importación -->
-                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
                     <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
                         <input type="radio" name="import-target" value="equipos" checked class="hidden peer">
                         <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">📱 Equipos</span>
@@ -121,7 +121,13 @@
                         <span class="text-[10px] text-slate-500">Packs / Material</span>
                     </label>
 
-                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group col-span-2 sm:col-span-1">
+                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
+                        <input type="radio" name="import-target" value="pop" class="hidden peer">
+                        <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">🎯 POP</span>
+                        <span class="text-[10px] text-slate-500">Material POP</span>
+                    </label>
+
+                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
                         <input type="radio" name="import-target" value="pedidos" class="hidden peer">
                         <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">📦 Pedidos</span>
                         <span class="text-[10px] text-slate-500">Pre-carga Órdenes</span>
@@ -192,7 +198,7 @@
                     <hr class="border-slate-700 my-2">
 
                     <!-- Series Section -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-slate-400 mb-1">Serie Equipo (IMEI/SN)</label>
                             <div class="relative">
@@ -218,10 +224,18 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Material Publicitario / Promo</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">Material Publicitario</label>
                             <div class="relative">
                                 <input type="text" id="ws-serie-publicidad" oninput="validateFieldLive('publicidad')" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pr-8">
                                 <span id="status-publicidad" class="absolute right-2.5 top-2.5"></span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">Material POP</label>
+                            <div class="relative">
+                                <input type="text" id="ws-serie-pop" oninput="validateFieldLive('pop')" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pr-8">
+                                <span id="status-pop" class="absolute right-2.5 top-2.5"></span>
                             </div>
                         </div>
                     </div>
@@ -284,7 +298,6 @@
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
 
     <script>
-        // DB App State
         let db = {
             operator: 'Iván Hurtado',
             pendingOrders: [],
@@ -292,6 +305,7 @@
             sims: [],
             esims: [],
             publicidad: [],
+            pop: [],
             orders: []
         };
 
@@ -365,7 +379,25 @@
             document.getElementById('stat-dispatched-orders').textContent = db.orders ? db.orders.length : 0;
         }
 
-        // --- File Upload & Confirm Logic Corrected ---
+        // --- Verificación de existencia previa de series ---
+        function findSeriesAssignment(serie) {
+            if (!serie) return null;
+            const targetSerie = String(serie).trim();
+
+            // 1. Revisar si ya fue despachado previamente
+            if (db.orders && Array.isArray(db.orders)) {
+                for (const order of db.orders) {
+                    if (order.series) {
+                        const s = order.series;
+                        if ([s.eqSerie, s.simSerie, s.esimSerie, s.pubSerie, s.popSerie].some(val => String(val).trim() === targetSerie)) {
+                            return { type: 'Despachado', orderNum: order.orderNum, date: order.date };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
         function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -389,7 +421,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // Función confirmImport Corregida
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
                 showToast('No hay datos pendientes para importar.', 'warning');
@@ -399,25 +430,19 @@
             const targetElement = document.querySelector('input[name="import-target"]:checked');
             const target = targetElement ? targetElement.value : 'equipos';
             let addedCount = 0;
+            let duplicateCount = 0;
 
             if (target === 'pedidos') {
                 pendingImportData.forEach(row => {
-                    const orderNum = String(
-                        row['Pedido SAP'] || row['pedido'] || row['Pedido'] || row['orderNum'] || ''
-                    ).trim();
-                    
-                    const agency = String(
-                        row['Descripción Bodega'] || row['agencia'] || row['Agencia'] || row['agency'] || ''
-                    ).trim();
-                    
-                    const serie = String(
-                        row['Serie'] || row['serie'] || row['imei'] || row['iccid'] || ''
-                    ).trim();
+                    const orderNum = String(row['Pedido SAP'] || row['pedido'] || row['Pedido'] || row['orderNum'] || '').trim();
+                    const agency = String(row['Descripción Bodega'] || row['agencia'] || row['Agencia'] || row['agency'] || '').trim();
+                    const serie = String(row['Serie'] || row['serie'] || row['imei'] || row['iccid'] || '').trim();
                     
                     let rawTipo = String(row['TIPO DEL LOTE'] || row['TIPO DE LOTE'] || row['tipo'] || 'equipo').toLowerCase().trim();
                     let tipo = 'equipo';
                     if (rawTipo.includes('esim')) tipo = 'esim';
                     else if (rawTipo.includes('sim')) tipo = 'sim';
+                    else if (rawTipo.includes('pop')) tipo = 'pop';
                     else if (rawTipo.includes('pub') || rawTipo.includes('promo')) tipo = 'publicidad';
 
                     const descripcion = String(row['Descripción'] || row['descripcion'] || '').trim();
@@ -426,17 +451,18 @@
                         if (!db.pendingOrders) db.pendingOrders = [];
                         let existing = db.pendingOrders.find(p => p.orderNum === orderNum);
                         if (!existing) {
-                            existing = { 
-                                orderNum, 
-                                agency: agency || 'Agencia General', 
-                                series: []
-                            };
+                            existing = { orderNum, agency: agency || 'Agencia General', series: [] };
                             db.pendingOrders.push(existing);
                         }
                         if (serie) {
-                            existing.series.push({ serie, tipo, detalleExtra: descripcion });
+                            const assignment = findSeriesAssignment(serie);
+                            if (!assignment) {
+                                existing.series.push({ serie, tipo, detalleExtra: descripcion });
+                                addedCount++;
+                            } else {
+                                duplicateCount++;
+                            }
                         }
-                        addedCount++;
                     }
                 });
             } else {
@@ -445,20 +471,16 @@
                 else if (target === 'esim' || target === 'esims') dbKey = 'esims';
                 else if (target === 'equipo' || target === 'equipos') dbKey = 'equipos';
                 else if (target === 'publicidad') dbKey = 'publicidad';
+                else if (target === 'pop') dbKey = 'pop';
 
                 if (!db[dbKey]) db[dbKey] = [];
 
                 pendingImportData.forEach(row => {
-                    const serie = String(
-                        row['Serie'] || row['serie'] || row['imei'] || row['ICCID'] || row['iccid'] || ''
-                    ).trim();
-                    
-                    const detail = String(
-                        row['Descripción'] || row['detalle'] || row['Detalle'] || ''
-                    ).trim();
+                    const serie = String(row['Serie'] || row['serie'] || row['imei'] || row['ICCID'] || row['iccid'] || '').trim();
+                    const detail = String(row['Descripción'] || row['detalle'] || row['Detalle'] || '').trim();
 
                     if (serie) {
-                        const isDuplicate = db[dbKey].some(i => String(i.serie).trim() === serie);
+                        const isDuplicate = db[dbKey].some(i => String(i.serie).trim() === serie) || findSeriesAssignment(serie);
                         if (!isDuplicate) {
                             db[dbKey].push({
                                 serie: serie,
@@ -468,6 +490,8 @@
                                 date: new Date().toLocaleDateString('es-EC')
                             });
                             addedCount++;
+                        } else {
+                            duplicateCount++;
                         }
                     }
                 });
@@ -483,9 +507,9 @@
             document.getElementById('excel-file-input').value = '';
 
             if (addedCount > 0) {
-                showToast(`¡Carga completada! Se importaron ${addedCount} registros.`, 'success');
+                showToast(`Se importaron ${addedCount} registros.${duplicateCount > 0 ? ` (${duplicateCount} omitidos por estar asignados previamente).` : ''}`, 'success');
             } else {
-                showToast('No se agregaron registros nuevos (registros existentes o vacíos).', 'warning');
+                showToast('No se agregaron registros nuevos (todas las series ya existen o han sido despachadas).', 'warning');
             }
         }
 
@@ -517,15 +541,17 @@
                 const sims = order.series.filter(s => s.tipo === 'sim').map(s => s.serie).join(', ');
                 const esims = order.series.filter(s => s.tipo === 'esim').map(s => s.serie).join(', ');
                 const publicidad = order.series.filter(s => s.tipo === 'publicidad').map(s => s.serie).join(', ');
+                const pop = order.series.filter(s => s.tipo === 'pop').map(s => s.serie).join(', ');
 
                 if (equipos) document.getElementById('ws-serie-equipo').value = equipos;
                 if (sims) document.getElementById('ws-serie-sim').value = sims;
                 if (esims) document.getElementById('ws-serie-esim').value = esims;
                 if (publicidad) document.getElementById('ws-serie-publicidad').value = publicidad;
+                if (pop) document.getElementById('ws-serie-pop').value = pop;
             }
 
-            ['equipo', 'sim', 'esim', 'publicidad'].forEach(validateFieldLive);
-            showToast(`Pedido #${order.orderNum} asignado.`, 'info');
+            ['equipo', 'sim', 'esim', 'publicidad', 'pop'].forEach(validateFieldLive);
+            showToast(`Pedido #${order.orderNum} cargado en la estación.`, 'info');
         }
 
         function validateFieldLive(type) {
@@ -533,16 +559,30 @@
             const statusEl = document.getElementById(`status-${type}`);
             if (!val) {
                 statusEl.innerHTML = '';
-                return;
+                return true;
             }
+
+            // Validar si alguna de las series ingresadas ya fue despachada
+            const seriesList = val.split(',').map(s => s.trim()).filter(Boolean);
+            for (const s of seriesList) {
+                const dup = findSeriesAssignment(s);
+                if (dup) {
+                    statusEl.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-red-500" title="Duplicado en pedido #${dup.orderNum}"></i>`;
+                    lucide.createIcons();
+                    return false;
+                }
+            }
+
             statusEl.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>`;
             lucide.createIcons();
+            return true;
         }
 
         function resetWorkstationForm() {
             document.getElementById('workstation-form').reset();
-            ['equipo', 'sim', 'esim', 'publicidad'].forEach(t => {
-                document.getElementById(`status-${t}`).innerHTML = '';
+            ['equipo', 'sim', 'esim', 'publicidad', 'pop'].forEach(t => {
+                const statusEl = document.getElementById(`status-${t}`);
+                if (statusEl) statusEl.innerHTML = '';
             });
             document.getElementById('pending-orders-select').value = '';
         }
@@ -558,6 +598,29 @@
                 return;
             }
 
+            const seriesObj = {
+                eqSerie: document.getElementById('ws-serie-equipo').value.trim(),
+                simSerie: document.getElementById('ws-serie-sim').value.trim(),
+                esimSerie: document.getElementById('ws-serie-esim').value.trim(),
+                pubSerie: document.getElementById('ws-serie-publicidad').value.trim(),
+                popSerie: document.getElementById('ws-serie-pop').value.trim()
+            };
+
+            // Verificación estricta de duplicados antes de confirmar despacho
+            for (const [key, rawSeries] of Object.entries(seriesObj)) {
+                if (rawSeries) {
+                    const list = rawSeries.split(',').map(s => s.trim()).filter(Boolean);
+                    for (const serie of list) {
+                        const dup = findSeriesAssignment(serie);
+                        if (dup) {
+                            alert(`Error de duplicado:\nLa serie "${serie}" ya fue asignada y despachada en el Pedido #${dup.orderNum} (${dup.date}).\nNo se puede volver a asignar.`);
+                            showToast(`Serie ${serie} duplicada. Operación cancelada.`, 'error');
+                            return;
+                        }
+                    }
+                }
+            }
+
             const newOrder = {
                 orderNum,
                 agency,
@@ -565,12 +628,7 @@
                 guiaCnt: document.getElementById('ws-guia-cnt').value.trim(),
                 guiaCourier: document.getElementById('ws-guia-courier').value.trim(),
                 peso: document.getElementById('ws-peso').value.trim(),
-                series: {
-                    eqSerie: document.getElementById('ws-serie-equipo').value.trim(),
-                    simSerie: document.getElementById('ws-serie-sim').value.trim(),
-                    esimSerie: document.getElementById('ws-serie-esim').value.trim(),
-                    pubSerie: document.getElementById('ws-serie-publicidad').value.trim()
-                },
+                series: seriesObj,
                 operator: db.operator || 'Desconocido',
                 date: new Date().toLocaleString('es-EC')
             };
@@ -604,7 +662,8 @@
                     o.series.eqSerie ? `EQ: ${o.series.eqSerie}` : '',
                     o.series.simSerie ? `SIM: ${o.series.simSerie}` : '',
                     o.series.esimSerie ? `eSIM: ${o.series.esimSerie}` : '',
-                    o.series.pubSerie ? `PUB: ${o.series.pubSerie}` : ''
+                    o.series.pubSerie ? `PUB: ${o.series.pubSerie}` : '',
+                    o.series.popSerie ? `POP: ${o.series.popSerie}` : ''
                 ].filter(Boolean).join(' | ');
 
                 tr.innerHTML = `
@@ -641,6 +700,7 @@
                 'Serie SIM': o.series ? o.series.simSerie : '',
                 'Serie eSIM': o.series ? o.series.esimSerie : '',
                 'Material Publicitario': o.series ? o.series.pubSerie : '',
+                'Material POP': o.series ? o.series.popSerie : '',
                 'Operario': o.operator,
                 'Fecha / Hora': o.date
             }));
