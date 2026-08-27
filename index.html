@@ -27,7 +27,7 @@
                 <div>
                     <h1 class="text-base font-bold tracking-wide flex items-center gap-2">
                         Sistema de Control de Despachos 
-                        <span class="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full font-mono">v3.8</span>
+                        <span class="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full font-mono">v4.0</span>
                     </h1>
                     <p class="text-xs text-slate-400">Corporación Nacional de Telecomunicaciones</p>
                 </div>
@@ -249,6 +249,40 @@
                 </form>
             </div>
 
+            <!-- Visor de Inventario y Series Cargadas -->
+            <div class="bg-slate-800/50 rounded-xl shadow-lg border border-slate-700/60 overflow-hidden">
+                <div class="bg-slate-800 border-b border-slate-700 px-5 py-3.5 flex justify-between items-center">
+                    <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                        <i data-lucide="boxes" class="w-4 h-4 text-blue-400"></i> Inventario y Series Pre-cargadas
+                    </h2>
+                </div>
+                
+                <!-- Pestañas del Visor -->
+                <div class="flex border-b border-slate-700 bg-slate-900/50 text-xs overflow-x-auto">
+                    <button onclick="switchInventoryTab('pedidos')" id="tab-pedidos" class="px-4 py-2.5 text-blue-400 border-b-2 border-blue-500 font-semibold focus:outline-none">📦 Pedidos</button>
+                    <button onclick="switchInventoryTab('equipos')" id="tab-equipos" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">📱 Equipos</button>
+                    <button onclick="switchInventoryTab('sims')" id="tab-sims" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">💳 SIMs</button>
+                    <button onclick="switchInventoryTab('esims')" id="tab-esims" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">🌐 eSIMs</button>
+                    <button onclick="switchInventoryTab('publicidad')" id="tab-publicidad" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">📣 Publicidad</button>
+                    <button onclick="switchInventoryTab('pop')" id="tab-pop" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">🎯 POP</button>
+                </div>
+
+                <div class="p-4 max-h-56 overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-900/80 text-slate-400 font-semibold border-b border-slate-700">
+                                <th class="p-2">Identificador / Serie</th>
+                                <th class="p-2">Detalle / Agencia</th>
+                                <th class="p-2">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="divide-y divide-slate-700/50 text-slate-300">
+                            <!-- Filas dinámicas -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Records Table -->
             <div class="bg-slate-800/50 rounded-xl shadow-lg border border-slate-700/60 overflow-hidden flex-grow flex flex-col">
                 <div class="bg-slate-800 border-b border-slate-700 px-5 py-3.5 flex justify-between items-center">
@@ -309,6 +343,7 @@
             orders: []
         };
 
+        let currentTab = 'pedidos';
         let pendingImportData = null;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -317,6 +352,7 @@
             updateOperatorDisplay();
             updateStats();
             renderPendingOrdersDropdown();
+            renderInventoryTable();
             renderOrdersTable();
             lucide.createIcons();
         });
@@ -396,6 +432,29 @@
             return null;
         }
 
+        function isSerieInInventory(serie, type) {
+            if (!serie) return false;
+            const targetSerie = String(serie).trim();
+
+            let dbKey = type;
+            if (type === 'equipo') dbKey = 'equipos';
+            if (type === 'sim') dbKey = 'sims';
+            if (type === 'esim') dbKey = 'esims';
+
+            if (db[dbKey] && Array.isArray(db[dbKey])) {
+                if (db[dbKey].some(item => String(item.serie).trim() === targetSerie)) return true;
+            }
+
+            if (db.pendingOrders && Array.isArray(db.pendingOrders)) {
+                for (const p of db.pendingOrders) {
+                    if (p.series && Array.isArray(p.series)) {
+                        if (p.series.some(s => String(s.serie).trim() === targetSerie)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -453,8 +512,8 @@
                             db.pendingOrders.push(existing);
                         }
                         if (serie) {
-                            const assignment = findSeriesAssignment(serie);
-                            if (!assignment) {
+                            const existsInOrder = existing.series.some(s => s.serie === serie);
+                            if (!existsInOrder && !findSeriesAssignment(serie)) {
                                 existing.series.push({ serie, tipo, detalleExtra: descripcion });
                                 addedCount++;
                             } else {
@@ -498,6 +557,7 @@
             saveLocalStorage();
             updateStats();
             renderPendingOrdersDropdown();
+            renderInventoryTable();
             renderOrdersTable();
             
             document.getElementById('import-preview').classList.add('hidden');
@@ -524,7 +584,6 @@
             }
         }
 
-        // --- SOLUCIÓN: Carga limpia y exclusiva por tipo de serie ---
         function handleSelectPendingOrder(index) {
             if (index === "" || index === null || index === undefined) return;
             const order = db.pendingOrders[index];
@@ -536,18 +595,16 @@
             document.getElementById('ws-agency').value = order.agency || '';
 
             if (order.series && Array.isArray(order.series)) {
-                // Mapear exactamente la serie que le corresponde al pedido por tipo de ítem
-                const eq = order.series.find(s => s.tipo === 'equipo' || s.tipo === 'equipos');
-                const sim = order.series.find(s => s.tipo === 'sim');
-                const esim = order.series.find(s => s.tipo === 'esim');
-                const pub = order.series.find(s => s.tipo === 'publicidad');
-                const pop = order.series.find(s => s.tipo === 'pop');
+                const getUniqueSerie = (type) => {
+                    const found = order.series.find(s => s.tipo === type);
+                    return found ? found.serie : '';
+                };
 
-                if (eq) document.getElementById('ws-serie-equipo').value = eq.serie;
-                if (sim) document.getElementById('ws-serie-sim').value = sim.serie;
-                if (esim) document.getElementById('ws-serie-esim').value = esim.serie;
-                if (pub) document.getElementById('ws-serie-publicidad').value = pub.serie;
-                if (pop) document.getElementById('ws-serie-pop').value = pop.serie;
+                document.getElementById('ws-serie-equipo').value = getUniqueSerie('equipo');
+                document.getElementById('ws-serie-sim').value = getUniqueSerie('sim');
+                document.getElementById('ws-serie-esim').value = getUniqueSerie('esim');
+                document.getElementById('ws-serie-publicidad').value = getUniqueSerie('publicidad');
+                document.getElementById('ws-serie-pop').value = getUniqueSerie('pop');
             }
 
             ['equipo', 'sim', 'esim', 'publicidad', 'pop'].forEach(validateFieldLive);
@@ -555,25 +612,43 @@
         }
 
         function validateFieldLive(type) {
-            const val = document.getElementById(`ws-serie-${type}`).value.trim();
+            const input = document.getElementById(`ws-serie-${type}`);
+            const val = input.value.trim();
             const statusEl = document.getElementById(`status-${type}`);
+
             if (!val) {
                 statusEl.innerHTML = '';
                 return true;
             }
 
             const seriesList = val.split(',').map(s => s.trim()).filter(Boolean);
+            
+            // Verificar si hay duplicados dentro del propio campo
+            if (new Set(seriesList).size !== seriesList.length) {
+                statusEl.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500" title="Serie repetida en el mismo campo"></i>`;
+                lucide.createIcons();
+                showToast(`Atención: La serie en ${type.toUpperCase()} se encuentra repetida en la entrada.`, 'warning');
+                return false;
+            }
+
             for (const s of seriesList) {
                 const dup = findSeriesAssignment(s);
                 if (dup) {
-                    statusEl.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-red-500" title="Duplicado en pedido #${dup.orderNum}"></i>`;
+                    statusEl.innerHTML = `<i data-lucide="x-circle" class="w-4 h-4 text-red-500" title="Serie ya despachada en pedido #${dup.orderNum}"></i>`;
                     lucide.createIcons();
+                    showToast(`Error: La serie "${s}" ya fue asignada al pedido #${dup.orderNum}.`, 'error');
                     return false;
                 }
-            }
 
-            statusEl.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>`;
-            lucide.createIcons();
+                if (!isSerieInInventory(s, type)) {
+                    statusEl.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 text-amber-400" title="Serie no pre-cargada en el inventario"></i>`;
+                    lucide.createIcons();
+                    showToast(`Advertencia: La serie "${s}" no está en la base de inventario pre-cargada.`, 'warning');
+                } else {
+                    statusEl.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>`;
+                    lucide.createIcons();
+                }
+            }
             return true;
         }
 
@@ -608,10 +683,14 @@
             for (const [key, rawSeries] of Object.entries(seriesObj)) {
                 if (rawSeries) {
                     const list = rawSeries.split(',').map(s => s.trim()).filter(Boolean);
+                    if (new Set(list).size !== list.length) {
+                        showToast(`Error: Hay series duplicadas en el formulario.`, 'error');
+                        return;
+                    }
                     for (const serie of list) {
                         const dup = findSeriesAssignment(serie);
                         if (dup) {
-                            alert(`Error de duplicado:\nLa serie "${serie}" ya fue asignada y despachada en el Pedido #${dup.orderNum} (${dup.date}).\nNo se puede volver a asignar.`);
+                            alert(`Error de duplicado:\nLa serie "${serie}" ya fue asignada y despachada en el Pedido #${dup.orderNum} (${dup.date}).`);
                             showToast(`Serie ${serie} duplicada. Operación cancelada.`, 'error');
                             return;
                         }
@@ -637,10 +716,68 @@
             saveLocalStorage();
             updateStats();
             renderPendingOrdersDropdown();
+            renderInventoryTable();
             renderOrdersTable();
             resetWorkstationForm();
 
             showToast(`Despacho registrado para pedido #${orderNum}.`, 'success');
+        }
+
+        function switchInventoryTab(tab) {
+            currentTab = tab;
+            ['pedidos', 'equipos', 'sims', 'esims', 'publicidad', 'pop'].forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                if (t === tab) {
+                    btn.className = 'px-4 py-2.5 text-blue-400 border-b-2 border-blue-500 font-semibold focus:outline-none';
+                } else {
+                    btn.className = 'px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none';
+                }
+            });
+            renderInventoryTable();
+        }
+
+        function renderInventoryTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+
+            if (currentTab === 'pedidos') {
+                if (!db.pendingOrders || db.pendingOrders.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-500">No hay pedidos pre-cargados</td></tr>`;
+                    return;
+                }
+                db.pendingOrders.forEach(p => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-800/40 transition';
+                    const seriesCount = p.series ? p.series.length : 0;
+                    tr.innerHTML = `
+                        <td class="p-2 font-bold text-blue-400">#${p.orderNum}</td>
+                        <td class="p-2">${p.agency}</td>
+                        <td class="p-2"><span class="bg-blue-900/60 text-blue-300 border border-blue-700 text-[10px] px-2 py-0.5 rounded-full">${seriesCount} series asociadas</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                const items = db[currentTab] || [];
+                if (items.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-500">No hay items pre-cargados en ${currentTab.toUpperCase()}</td></tr>`;
+                    return;
+                }
+                items.forEach(i => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-800/40 transition';
+                    const dup = findSeriesAssignment(i.serie);
+                    const statusBadge = dup 
+                        ? `<span class="bg-red-900/60 text-red-300 border border-red-700 text-[10px] px-2 py-0.5 rounded-full">Despachado (#${dup.orderNum})</span>`
+                        : `<span class="bg-emerald-900/60 text-emerald-300 border border-emerald-700 text-[10px] px-2 py-0.5 rounded-full">Disponible</span>`;
+
+                    tr.innerHTML = `
+                        <td class="p-2 font-mono text-slate-200">${i.serie}</td>
+                        <td class="p-2 text-slate-400">${i.detail || 'Sin detalle'}</td>
+                        <td class="p-2">${statusBadge}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
         }
 
         function renderOrdersTable() {
@@ -713,6 +850,7 @@
             
             saveLocalStorage();
             updateStats();
+            renderInventoryTable();
             renderOrdersTable();
 
             showToast(`Reporte exportado. Se limpiaron ${totalLimpiados} despachos del historial.`, 'success');
