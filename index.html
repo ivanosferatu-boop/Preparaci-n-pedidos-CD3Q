@@ -1,860 +1,159 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Despachos y Logística - CNT EP</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SheetJS (XLSX) CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- Lucide Icons CDN -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .toast-enter { transform: translateY(100%); opacity: 0; }
-        .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 300ms ease-out; }
-        .toast-exit { transform: translateY(0); opacity: 1; }
-        .toast-exit-active { transform: translateY(100%); opacity: 0; transition: all 300ms ease-in; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carga Masiva de Inventario y Pedidos</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 min-h-screen text-slate-100 flex flex-col font-sans">
+<body class="bg-slate-950 text-slate-100 min-h-screen p-6 font-sans">
 
-    <!-- Header Navigation -->
-    <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700 text-white sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex items-center space-x-3">
-                <div class="bg-blue-600 p-2 rounded-lg text-white font-bold text-xs tracking-wider">CNT</div>
-                <div>
-                    <h1 class="text-base font-bold tracking-wide flex items-center gap-2">
-                        Sistema de Control de Despachos 
-                        <span class="text-[10px] bg-blue-900/60 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full font-mono">v4.0</span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Corporación Nacional de Telecomunicaciones</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-700/60 text-xs">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="text-slate-300">Modo Local</span>
-                </div>
-                <div class="text-right text-xs border-l border-slate-700 pl-4">
-                    <p class="font-semibold text-slate-200" id="operator-display">Operador: Iván Hurtado</p>
-                    <p class="text-slate-400 text-[10px]" id="current-date-display">--/--/----</p>
-                </div>
-                <button onclick="openOperatorModal()" class="bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded text-xs flex items-center gap-1.5 transition text-slate-200">
-                    <i data-lucide="user-cog" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Container -->
-    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-        <!-- Sidebar Dashboard / Quick Actions -->
-        <aside class="lg:col-span-1 flex flex-col gap-6">
-            
-            <!-- Quick Stats -->
-            <div class="bg-slate-800/50 rounded-xl shadow-lg p-4 border border-slate-700/60">
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <i data-lucide="bar-chart-2" class="w-4 h-4 text-blue-400"></i> Resumen de Operación
-                </h2>
-                <div class="grid grid-cols-2 gap-3 text-center">
-                    <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
-                        <span class="block text-2xl font-extrabold text-blue-400" id="stat-pending-orders">0</span>
-                        <span class="text-[11px] font-medium text-slate-400">Pedidos Pendientes</span>
-                    </div>
-                    <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
-                        <span class="block text-2xl font-extrabold text-emerald-400" id="stat-dispatched-orders">0</span>
-                        <span class="text-[11px] font-medium text-slate-400">Despachados</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Preloaded Orders Dropdown -->
-            <div class="bg-slate-800/50 rounded-xl shadow-lg p-4 border border-slate-700/60">
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <i data-lucide="list-filter" class="w-4 h-4 text-blue-400"></i> Cargar Pedido
-                </h2>
-                <select id="pending-orders-select" onchange="handleSelectPendingOrder(this.value)" class="w-full text-xs p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="">-- Seleccionar de pendientes --</option>
-                </select>
-            </div>
-
-        </aside>
-
-        <!-- Main Workstation Section -->
-        <section class="lg:col-span-3 flex flex-col gap-6">
-
-            <!-- Import Section -->
-            <div class="bg-slate-800/50 rounded-xl shadow-lg border border-slate-700/60 p-5 space-y-4">
-                <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
-                    <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
-                        <i data-lucide="file-up" class="w-4 h-4 text-blue-400"></i> Carga Masiva desde Archivo Excel / CSV
-                    </h2>
-                </div>
-
-                <!-- Categorías de Importación -->
-                <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 text-xs">
-                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
-                        <input type="radio" name="import-target" value="equipos" checked class="hidden peer">
-                        <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">📱 Equipos</span>
-                        <span class="text-[10px] text-slate-500">Series / IMEI</span>
-                    </label>
-
-                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
-                        <input type="radio" name="import-target" value="sims" class="hidden peer">
-                        <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">💳 SIM Cards</span>
-                        <span class="text-[10px] text-slate-500">ICCID</span>
-                    </label>
-
-                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
-                        <input type="radio" name="import-target" value="esims" class="hidden peer">
-                        <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">🌐 eSIMs</span>
-                        <span class="text-[10px] text-slate-500">Códigos QR</span>
-                    </label>
-
-                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
-                        <input type="radio" name="import-target" value="publicidad" class="hidden peer">
-                        <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">📣 Publicidad</span>
-                        <span class="text-[10px] text-slate-500">Packs / Material</span>
-                    </label>
-
-                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
-                        <input type="radio" name="import-target" value="pop" class="hidden peer">
-                        <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">🎯 POP</span>
-                        <span class="text-[10px] text-slate-500">Material POP</span>
-                    </label>
-
-                    <label class="flex flex-col items-center justify-center p-2.5 bg-slate-900/60 rounded-lg border border-slate-700 cursor-pointer hover:border-blue-500 transition text-center group">
-                        <input type="radio" name="import-target" value="pedidos" class="hidden peer">
-                        <span class="peer-checked:text-blue-400 text-slate-300 font-semibold mb-0.5">📦 Pedidos</span>
-                        <span class="text-[10px] text-slate-500">Pre-carga Órdenes</span>
-                    </label>
-                </div>
-
-                <div class="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center bg-slate-900/40 hover:bg-slate-900/80 transition cursor-pointer relative" onclick="document.getElementById('excel-file-input').click()">
-                    <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-500 mx-auto mb-2"></i>
-                    <span class="block text-xs font-semibold text-slate-300">Arrastre su archivo Excel (.xlsx) o CSV aquí</span>
-                    <span class="block text-[11px] text-slate-500 mt-1">Soporta columnas: Pedido SAP, Descripción Bodega, Serie, TIPO DEL LOTE</span>
-                    <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
-                </div>
-
-                <!-- Preview Box -->
-                <div id="import-preview" class="hidden bg-slate-900 border border-slate-700 rounded-lg p-3 space-y-2">
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="font-bold text-slate-300" id="preview-count">0 registros hallados</span>
-                        <button onclick="confirmImport()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded text-xs transition flex items-center gap-1">
-                            <i data-lucide="check" class="w-3.5 h-3.5"></i> Confirmar e Importar
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Workstation Form -->
-            <div class="bg-slate-800/50 rounded-xl shadow-lg border border-slate-700/60 overflow-hidden">
-                <div class="bg-slate-800 border-b border-slate-700 px-5 py-3.5 flex justify-between items-center">
-                    <h2 class="text-sm font-bold text-slate-200 tracking-wide flex items-center gap-2">
-                        <i data-lucide="scan-line" class="w-4 h-4 text-blue-400"></i> Estación de Verificación y Despacho
-                    </h2>
-                    <button onclick="resetWorkstationForm()" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition">
-                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Limpiar Campos
-                    </button>
-                </div>
-
-                <form id="workstation-form" onsubmit="handleDispatchSubmit(event)" class="p-5 space-y-4">
-                    <!-- General Data -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1"># Pedido SAP *</label>
-                            <input type="text" id="ws-order-number" required class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Agencia Destino *</label>
-                            <input type="text" id="ws-agency" required class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Salida SAP / Reserva</label>
-                            <input type="text" id="ws-salida-sap" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Guía Interna CNT</label>
-                            <input type="text" id="ws-guia-cnt" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Guía Courier Ext.</label>
-                            <input type="text" id="ws-guia-courier" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Peso Estimado (Kg)</label>
-                            <input type="number" step="0.01" id="ws-peso" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-                    </div>
-
-                    <hr class="border-slate-700 my-2">
-
-                    <!-- Series Section -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Serie Equipo (IMEI/SN)</label>
-                            <div class="relative">
-                                <input type="text" id="ws-serie-equipo" oninput="validateFieldLive('equipo')" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pr-8">
-                                <span id="status-equipo" class="absolute right-2.5 top-2.5"></span>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Serie SIM Card (ICCID)</label>
-                            <div class="relative">
-                                <input type="text" id="ws-serie-sim" oninput="validateFieldLive('sim')" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pr-8">
-                                <span id="status-sim" class="absolute right-2.5 top-2.5"></span>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Serie eSIM (Código/ICCID)</label>
-                            <div class="relative">
-                                <input type="text" id="ws-serie-esim" oninput="validateFieldLive('esim')" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pr-8">
-                                <span id="status-esim" class="absolute right-2.5 top-2.5"></span>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Material Publicitario</label>
-                            <div class="relative">
-                                <input type="text" id="ws-serie-publicidad" oninput="validateFieldLive('publicidad')" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pr-8">
-                                <span id="status-publicidad" class="absolute right-2.5 top-2.5"></span>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Material POP</label>
-                            <div class="relative">
-                                <input type="text" id="ws-serie-pop" oninput="validateFieldLive('pop')" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none pr-8">
-                                <span id="status-pop" class="absolute right-2.5 top-2.5"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <div class="pt-3 flex justify-end">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-6 py-2.5 rounded-lg shadow-lg flex items-center gap-2 transition">
-                            <i data-lucide="check-circle" class="w-4 h-4"></i> Registrar Despacho
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Visor de Inventario y Series Cargadas -->
-            <div class="bg-slate-800/50 rounded-xl shadow-lg border border-slate-700/60 overflow-hidden">
-                <div class="bg-slate-800 border-b border-slate-700 px-5 py-3.5 flex justify-between items-center">
-                    <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
-                        <i data-lucide="boxes" class="w-4 h-4 text-blue-400"></i> Inventario y Series Pre-cargadas
-                    </h2>
-                </div>
-                
-                <!-- Pestañas del Visor -->
-                <div class="flex border-b border-slate-700 bg-slate-900/50 text-xs overflow-x-auto">
-                    <button onclick="switchInventoryTab('pedidos')" id="tab-pedidos" class="px-4 py-2.5 text-blue-400 border-b-2 border-blue-500 font-semibold focus:outline-none">📦 Pedidos</button>
-                    <button onclick="switchInventoryTab('equipos')" id="tab-equipos" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">📱 Equipos</button>
-                    <button onclick="switchInventoryTab('sims')" id="tab-sims" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">💳 SIMs</button>
-                    <button onclick="switchInventoryTab('esims')" id="tab-esims" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">🌐 eSIMs</button>
-                    <button onclick="switchInventoryTab('publicidad')" id="tab-publicidad" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">📣 Publicidad</button>
-                    <button onclick="switchInventoryTab('pop')" id="tab-pop" class="px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none">🎯 POP</button>
-                </div>
-
-                <div class="p-4 max-h-56 overflow-y-auto">
-                    <table class="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr class="bg-slate-900/80 text-slate-400 font-semibold border-b border-slate-700">
-                                <th class="p-2">Identificador / Serie</th>
-                                <th class="p-2">Detalle / Agencia</th>
-                                <th class="p-2">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body" class="divide-y divide-slate-700/50 text-slate-300">
-                            <!-- Filas dinámicas -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Records Table -->
-            <div class="bg-slate-800/50 rounded-xl shadow-lg border border-slate-700/60 overflow-hidden flex-grow flex flex-col">
-                <div class="bg-slate-800 border-b border-slate-700 px-5 py-3.5 flex justify-between items-center">
-                    <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
-                        <i data-lucide="table" class="w-4 h-4 text-blue-400"></i> Despachos Procesados
-                    </h2>
-                    <button onclick="exportOrdersToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition">
-                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar Excel y Limpiar
-                    </button>
-                </div>
-
-                <div class="overflow-x-auto flex-grow">
-                    <table class="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr class="bg-slate-900/80 text-slate-400 font-semibold border-b border-slate-700">
-                                <th class="p-3"># Pedido</th>
-                                <th class="p-3">Agencia</th>
-                                <th class="p-3">Guía Courier</th>
-                                <th class="p-3">Series</th>
-                                <th class="p-3">Operador</th>
-                                <th class="p-3">Fecha</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-table-body" class="divide-y divide-slate-700/50 text-slate-300">
-                            <!-- Filas dinámicas -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-        </section>
-    </main>
-
-    <!-- Modal Operador -->
-    <div id="operator-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center z-50">
-        <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-sm shadow-2xl">
-            <h3 class="text-sm font-bold text-slate-100 mb-2">Identificación del Operario</h3>
-            <p class="text-xs text-slate-400 mb-4">Ingrese su nombre para asociarlo a las operaciones realizadas.</p>
-            <input type="text" id="operator-input" placeholder="Nombre completo" class="w-full text-xs p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none mb-4">
-            <div class="flex justify-end gap-2">
-                <button onclick="saveOperator()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-lg font-semibold transition">Guardar</button>
-            </div>
-        </div>
+  <div class="max-w-6xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+    
+    <!-- Encabezado de la Sección -->
+    <div class="flex items-center space-x-3 mb-6">
+      <div class="p-2 bg-blue-600/20 rounded-lg text-blue-400">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-white tracking-wide">Carga Masiva desde Archivo Excel / CSV</h2>
     </div>
 
-    <!-- Toast Notifications Container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+    <!-- Pestañas de Selección de Categoría (6 Opciones) -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+      
+      <!-- 1. Equipos -->
+      <button type="button" onclick="selectUploadType('equipos')" id="btn-equipos" 
+        class="upload-tab-btn flex flex-col items-center justify-center p-3 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 transition-all cursor-pointer">
+        <span class="text-sm font-semibold mb-1 flex items-center gap-1.5">📱 Equipos</span>
+        <span class="text-[11px] text-slate-400">Series / IMEI</span>
+      </button>
+
+      <!-- 2. SIM Cards -->
+      <button type="button" onclick="selectUploadType('sim')" id="btn-sim" 
+        class="upload-tab-btn flex flex-col items-center justify-center p-3 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 transition-all cursor-pointer">
+        <span class="text-sm font-semibold mb-1 flex items-center gap-1.5">💳 SIM Cards</span>
+        <span class="text-[11px] text-slate-400">ICCID</span>
+      </button>
+
+      <!-- 3. eSIMs -->
+      <button type="button" onclick="selectUploadType('esim')" id="btn-esim" 
+        class="upload-tab-btn flex flex-col items-center justify-center p-3 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 transition-all cursor-pointer">
+        <span class="text-sm font-semibold mb-1 flex items-center gap-1.5">🌐 eSIMs</span>
+        <span class="text-[11px] text-slate-400">Códigos QR</span>
+      </button>
+
+      <!-- 4. Publicidad -->
+      <button type="button" onclick="selectUploadType('publicidad')" id="btn-publicidad" 
+        class="upload-tab-btn flex flex-col items-center justify-center p-3 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 transition-all cursor-pointer">
+        <span class="text-sm font-semibold mb-1 flex items-center gap-1.5">📣 Publicidad</span>
+        <span class="text-[11px] text-slate-400">Packs / Material</span>
+      </button>
+
+      <!-- 5. POP -->
+      <button type="button" onclick="selectUploadType('pop')" id="btn-pop" 
+        class="upload-tab-btn flex flex-col items-center justify-center p-3 rounded-xl border border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 transition-all cursor-pointer">
+        <span class="text-sm font-semibold mb-1 flex items-center gap-1.5">🎯 POP</span>
+        <span class="text-[11px] text-slate-400">Material POP</span>
+      </button>
+
+      <!-- 6. Pedidos (Nuevo) -->
+      <button type="button" onclick="selectUploadType('pedidos')" id="btn-pedidos" 
+        class="upload-tab-btn flex flex-col items-center justify-center p-3 rounded-xl border border-blue-500 bg-blue-500/10 transition-all cursor-pointer">
+        <span class="text-sm font-semibold mb-1 flex items-center gap-1.5 text-blue-400">📦 Pedidos</span>
+        <span class="text-[11px] text-slate-400">Pre-carga Órdenes</span>
+      </button>
+
+    </div>
+
+    <!-- Zona Drag & Drop / Input File -->
+    <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-blue-500/50 rounded-2xl p-10 text-center bg-slate-950/40 transition-colors cursor-pointer relative">
+      <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" onchange="handleFileSelect(event)">
+      
+      <label for="file-input" class="cursor-pointer flex flex-col items-center justify-center">
+        <div class="p-4 bg-slate-800/80 rounded-full mb-4 text-blue-400 border border-slate-700">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+        </div>
+        <p class="text-slate-200 font-semibold text-base mb-1">Arrastre su archivo Excel (.xlsx) o CSV aquí</p>
+        <p class="text-xs text-slate-500 mb-3">o haga clic para explorar en su equipo</p>
+        
+        <p id="upload-hint" class="text-xs text-blue-400/90 font-medium bg-blue-500/10 px-3 py-1.5 rounded-md border border-blue-500/20">
+          Soporta columnas: Pedido SAP, Fecha Emisión, Punto Venta / Bodega Destino, Estado
+        </p>
+      </label>
+    </div>
+
+  </div>
+
+  <!-- Script de Control -->
+  <script>
+    // Tipo de carga por defecto
+    let currentUploadType = 'pedidos';
+
+    // Diccionario de especificaciones de columnas requeridas por tipo
+    const uploadConfigs = {
+      equipos: {
+        hint: "Soporta columnas: Pedido SAP, Descripción Bodega, Serie / IMEI, TIPO DEL LOTE"
+      },
+      sim: {
+        hint: "Soporta columnas: Pedido SAP, ICCID, Rango Inicial, Rango Final, Cantidad"
+      },
+      esim: {
+        hint: "Soporta columnas: Pedido SAP, Código QR, Pin/Puk, Serial eSIM"
+      },
+      publicidad: {
+        hint: "Soporta columnas: Pedido SAP, Código Material, Descripción, Cantidad Pack"
+      },
+      pop: {
+        hint: "Soporta columnas: Pedido SAP, Tipo Material POP, Cantidad, Destino"
+      },
+      pedidos: {
+        hint: "Soporta columnas: Pedido SAP, Fecha Emisión, Punto Venta / Bodega Destino, Estado"
+      }
+    };
+
+    // Función para cambiar entre categorías
+    function selectUploadType(type) {
+      currentUploadType = type;
+
+      // 1. Desmarcar todos los botones
+      document.querySelectorAll('.upload-tab-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'bg-blue-500/10');
+        btn.classList.add('border-slate-700', 'bg-slate-800/50');
+        
+        const titleSpan = btn.querySelector('span:first-child');
+        if (titleSpan) titleSpan.classList.remove('text-blue-400');
+      });
+
+      // 2. Marcar botón activo
+      const activeBtn = document.getElementById(`btn-${type}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-slate-700', 'bg-slate-800/50');
+        activeBtn.classList.add('border-blue-500', 'bg-blue-500/10');
+        
+        const titleSpan = activeBtn.querySelector('span:first-child');
+        if (titleSpan) titleSpan.classList.add('text-blue-400');
+      }
+
+      // 3. Actualizar dinámicamente las columnas sugeridas
+      const hintElement = document.getElementById('upload-hint');
+      if (hintElement && uploadConfigs[type]) {
+        hintElement.textContent = uploadConfigs[type].hint;
+      }
+    }
+
+    // Manejador del archivo seleccionado
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) {
+        alert(`Archivo "${file.name}" cargado correctamente para la categoría: ${currentUploadType.toUpperCase()}`);
+      }
+    }
+  </script>
 
-    <script>
-        let db = {
-            operator: 'Iván Hurtado',
-            pendingOrders: [],
-            equipos: [],
-            sims: [],
-            esims: [],
-            publicidad: [],
-            pop: [],
-            orders: []
-        };
-
-        let currentTab = 'pedidos';
-        let pendingImportData = null;
-
-        document.addEventListener('DOMContentLoaded', () => {
-            loadLocalStorage();
-            document.getElementById('current-date-display').textContent = new Date().toLocaleDateString('es-EC');
-            updateOperatorDisplay();
-            updateStats();
-            renderPendingOrdersDropdown();
-            renderInventoryTable();
-            renderOrdersTable();
-            lucide.createIcons();
-        });
-
-        function saveLocalStorage() {
-            localStorage.setItem('cnt_dispatch_db', JSON.stringify(db));
-        }
-
-        function loadLocalStorage() {
-            const stored = localStorage.getItem('cnt_dispatch_db');
-            if (stored) {
-                try {
-                    db = Object.assign(db, JSON.parse(stored));
-                } catch(e) { console.error('Error cargando LocalStorage', e); }
-            }
-        }
-
-        function updateOperatorDisplay() {
-            document.getElementById('operator-display').textContent = `Operador: ${db.operator || 'No asignado'}`;
-        }
-
-        function openOperatorModal() {
-            document.getElementById('operator-input').value = db.operator || '';
-            document.getElementById('operator-modal').classList.remove('hidden');
-        }
-
-        function saveOperator() {
-            const val = document.getElementById('operator-input').value.trim();
-            if (val) {
-                db.operator = val;
-                saveLocalStorage();
-                updateOperatorDisplay();
-                document.getElementById('operator-modal').classList.add('hidden');
-                showToast('Operador actualizado.', 'info');
-            }
-        }
-
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            
-            let bgClass = 'bg-slate-800 border-slate-700 text-slate-100';
-            if (type === 'success') bgClass = 'bg-emerald-600 text-white';
-            if (type === 'warning') bgClass = 'bg-amber-600 text-white';
-            if (type === 'error') bgClass = 'bg-red-600 text-white';
-
-            toast.className = `${bgClass} text-xs px-4 py-3 rounded-lg shadow-2xl border flex items-center gap-2 toast-enter`;
-            toast.innerHTML = `<span>${message}</span>`;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.classList.add('toast-exit-active');
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        }
-
-        function updateStats() {
-            document.getElementById('stat-pending-orders').textContent = db.pendingOrders ? db.pendingOrders.length : 0;
-            document.getElementById('stat-dispatched-orders').textContent = db.orders ? db.orders.length : 0;
-        }
-
-        function findSeriesAssignment(serie) {
-            if (!serie) return null;
-            const targetSerie = String(serie).trim();
-
-            if (db.orders && Array.isArray(db.orders)) {
-                for (const order of db.orders) {
-                    if (order.series) {
-                        const s = order.series;
-                        if ([s.eqSerie, s.simSerie, s.esimSerie, s.pubSerie, s.popSerie].some(val => String(val).trim() === targetSerie)) {
-                            return { type: 'Despachado', orderNum: order.orderNum, date: order.date };
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-
-        function isSerieInInventory(serie, type) {
-            if (!serie) return false;
-            const targetSerie = String(serie).trim();
-
-            let dbKey = type;
-            if (type === 'equipo') dbKey = 'equipos';
-            if (type === 'sim') dbKey = 'sims';
-            if (type === 'esim') dbKey = 'esims';
-
-            if (db[dbKey] && Array.isArray(db[dbKey])) {
-                if (db[dbKey].some(item => String(item.serie).trim() === targetSerie)) return true;
-            }
-
-            if (db.pendingOrders && Array.isArray(db.pendingOrders)) {
-                for (const p of db.pendingOrders) {
-                    if (p.series && Array.isArray(p.series)) {
-                        if (p.series.some(s => String(s.serie).trim() === targetSerie)) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        function handleFileUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                try {
-                    const data = new Uint8Array(evt.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    pendingImportData = XLSX.utils.sheet_to_json(worksheet);
-
-                    document.getElementById('preview-count').textContent = `${pendingImportData.length} registros hallados`;
-                    document.getElementById('import-preview').classList.remove('hidden');
-                    showToast('Archivo leído correctamente.', 'info');
-                } catch (err) {
-                    showToast('Error al procesar el archivo Excel.', 'error');
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function confirmImport() {
-            if (!pendingImportData || pendingImportData.length === 0) {
-                showToast('No hay datos pendientes para importar.', 'warning');
-                return;
-            }
-
-            const targetElement = document.querySelector('input[name="import-target"]:checked');
-            const target = targetElement ? targetElement.value : 'equipos';
-            let addedCount = 0;
-            let duplicateCount = 0;
-
-            if (target === 'pedidos') {
-                pendingImportData.forEach(row => {
-                    const orderNum = String(row['Pedido SAP'] || row['pedido'] || row['Pedido'] || row['orderNum'] || '').trim();
-                    const agency = String(row['Descripción Bodega'] || row['agencia'] || row['Agencia'] || row['agency'] || '').trim();
-                    const serie = String(row['Serie'] || row['serie'] || row['imei'] || row['iccid'] || '').trim();
-                    
-                    let rawTipo = String(row['TIPO DEL LOTE'] || row['TIPO DE LOTE'] || row['tipo'] || 'equipo').toLowerCase().trim();
-                    let tipo = 'equipo';
-                    if (rawTipo.includes('esim')) tipo = 'esim';
-                    else if (rawTipo.includes('sim')) tipo = 'sim';
-                    else if (rawTipo.includes('pop')) tipo = 'pop';
-                    else if (rawTipo.includes('pub') || rawTipo.includes('promo')) tipo = 'publicidad';
-
-                    const descripcion = String(row['Descripción'] || row['descripcion'] || '').trim();
-
-                    if (orderNum) {
-                        if (!db.pendingOrders) db.pendingOrders = [];
-                        let existing = db.pendingOrders.find(p => p.orderNum === orderNum);
-                        if (!existing) {
-                            existing = { orderNum, agency: agency || 'Agencia General', series: [] };
-                            db.pendingOrders.push(existing);
-                        }
-                        if (serie) {
-                            const existsInOrder = existing.series.some(s => s.serie === serie);
-                            if (!existsInOrder && !findSeriesAssignment(serie)) {
-                                existing.series.push({ serie, tipo, detalleExtra: descripcion });
-                                addedCount++;
-                            } else {
-                                duplicateCount++;
-                            }
-                        }
-                    }
-                });
-            } else {
-                let dbKey = target;
-                if (target === 'sim' || target === 'sims') dbKey = 'sims';
-                else if (target === 'esim' || target === 'esims') dbKey = 'esims';
-                else if (target === 'equipo' || target === 'equipos') dbKey = 'equipos';
-                else if (target === 'publicidad') dbKey = 'publicidad';
-                else if (target === 'pop') dbKey = 'pop';
-
-                if (!db[dbKey]) db[dbKey] = [];
-
-                pendingImportData.forEach(row => {
-                    const serie = String(row['Serie'] || row['serie'] || row['imei'] || row['ICCID'] || row['iccid'] || '').trim();
-                    const detail = String(row['Descripción'] || row['detalle'] || row['Detalle'] || '').trim();
-
-                    if (serie) {
-                        const isDuplicate = db[dbKey].some(i => String(i.serie).trim() === serie) || findSeriesAssignment(serie);
-                        if (!isDuplicate) {
-                            db[dbKey].push({
-                                serie: serie,
-                                detail: detail || 'Sin descripción',
-                                status: 'Disponible',
-                                assignedOrder: null,
-                                date: new Date().toLocaleDateString('es-EC')
-                            });
-                            addedCount++;
-                        } else {
-                            duplicateCount++;
-                        }
-                    }
-                });
-            }
-
-            saveLocalStorage();
-            updateStats();
-            renderPendingOrdersDropdown();
-            renderInventoryTable();
-            renderOrdersTable();
-            
-            document.getElementById('import-preview').classList.add('hidden');
-            pendingImportData = null;
-            document.getElementById('excel-file-input').value = '';
-
-            if (addedCount > 0) {
-                showToast(`Se importaron ${addedCount} registros.${duplicateCount > 0 ? ` (${duplicateCount} omitidos por duplicado).` : ''}`, 'success');
-            } else {
-                showToast('No se agregaron registros nuevos (series duplicadas o procesadas).', 'warning');
-            }
-        }
-
-        function renderPendingOrdersDropdown() {
-            const select = document.getElementById('pending-orders-select');
-            select.innerHTML = '<option value="">-- Seleccionar de pendientes --</option>';
-            if (db.pendingOrders) {
-                db.pendingOrders.forEach((item, index) => {
-                    const opt = document.createElement('option');
-                    opt.value = index;
-                    opt.textContent = `Pedido #${item.orderNum} - ${item.agency}`;
-                    select.appendChild(opt);
-                });
-            }
-        }
-
-        function handleSelectPendingOrder(index) {
-            if (index === "" || index === null || index === undefined) return;
-            const order = db.pendingOrders[index];
-            if (!order) return;
-
-            resetWorkstationForm();
-
-            document.getElementById('ws-order-number').value = order.orderNum || '';
-            document.getElementById('ws-agency').value = order.agency || '';
-
-            if (order.series && Array.isArray(order.series)) {
-                const getUniqueSerie = (type) => {
-                    const found = order.series.find(s => s.tipo === type);
-                    return found ? found.serie : '';
-                };
-
-                document.getElementById('ws-serie-equipo').value = getUniqueSerie('equipo');
-                document.getElementById('ws-serie-sim').value = getUniqueSerie('sim');
-                document.getElementById('ws-serie-esim').value = getUniqueSerie('esim');
-                document.getElementById('ws-serie-publicidad').value = getUniqueSerie('publicidad');
-                document.getElementById('ws-serie-pop').value = getUniqueSerie('pop');
-            }
-
-            ['equipo', 'sim', 'esim', 'publicidad', 'pop'].forEach(validateFieldLive);
-            showToast(`Pedido #${order.orderNum} cargado correctamente.`, 'info');
-        }
-
-        function validateFieldLive(type) {
-            const input = document.getElementById(`ws-serie-${type}`);
-            const val = input.value.trim();
-            const statusEl = document.getElementById(`status-${type}`);
-
-            if (!val) {
-                statusEl.innerHTML = '';
-                return true;
-            }
-
-            const seriesList = val.split(',').map(s => s.trim()).filter(Boolean);
-            
-            // Verificar si hay duplicados dentro del propio campo
-            if (new Set(seriesList).size !== seriesList.length) {
-                statusEl.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500" title="Serie repetida en el mismo campo"></i>`;
-                lucide.createIcons();
-                showToast(`Atención: La serie en ${type.toUpperCase()} se encuentra repetida en la entrada.`, 'warning');
-                return false;
-            }
-
-            for (const s of seriesList) {
-                const dup = findSeriesAssignment(s);
-                if (dup) {
-                    statusEl.innerHTML = `<i data-lucide="x-circle" class="w-4 h-4 text-red-500" title="Serie ya despachada en pedido #${dup.orderNum}"></i>`;
-                    lucide.createIcons();
-                    showToast(`Error: La serie "${s}" ya fue asignada al pedido #${dup.orderNum}.`, 'error');
-                    return false;
-                }
-
-                if (!isSerieInInventory(s, type)) {
-                    statusEl.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 text-amber-400" title="Serie no pre-cargada en el inventario"></i>`;
-                    lucide.createIcons();
-                    showToast(`Advertencia: La serie "${s}" no está en la base de inventario pre-cargada.`, 'warning');
-                } else {
-                    statusEl.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>`;
-                    lucide.createIcons();
-                }
-            }
-            return true;
-        }
-
-        function resetWorkstationForm() {
-            document.getElementById('workstation-form').reset();
-            ['equipo', 'sim', 'esim', 'publicidad', 'pop'].forEach(t => {
-                const statusEl = document.getElementById(`status-${t}`);
-                if (statusEl) statusEl.innerHTML = '';
-            });
-            document.getElementById('pending-orders-select').value = '';
-        }
-
-        function handleDispatchSubmit(e) {
-            e.preventDefault();
-            
-            const orderNum = document.getElementById('ws-order-number').value.trim();
-            const agency = document.getElementById('ws-agency').value.trim();
-
-            if (!orderNum || !agency) {
-                showToast('Pedido y agencia son campos requeridos.', 'error');
-                return;
-            }
-
-            const seriesObj = {
-                eqSerie: document.getElementById('ws-serie-equipo').value.trim(),
-                simSerie: document.getElementById('ws-serie-sim').value.trim(),
-                esimSerie: document.getElementById('ws-serie-esim').value.trim(),
-                pubSerie: document.getElementById('ws-serie-publicidad').value.trim(),
-                popSerie: document.getElementById('ws-serie-pop').value.trim()
-            };
-
-            for (const [key, rawSeries] of Object.entries(seriesObj)) {
-                if (rawSeries) {
-                    const list = rawSeries.split(',').map(s => s.trim()).filter(Boolean);
-                    if (new Set(list).size !== list.length) {
-                        showToast(`Error: Hay series duplicadas en el formulario.`, 'error');
-                        return;
-                    }
-                    for (const serie of list) {
-                        const dup = findSeriesAssignment(serie);
-                        if (dup) {
-                            alert(`Error de duplicado:\nLa serie "${serie}" ya fue asignada y despachada en el Pedido #${dup.orderNum} (${dup.date}).`);
-                            showToast(`Serie ${serie} duplicada. Operación cancelada.`, 'error');
-                            return;
-                        }
-                    }
-                }
-            }
-
-            const newOrder = {
-                orderNum,
-                agency,
-                salidaSap: document.getElementById('ws-salida-sap').value.trim(),
-                guiaCnt: document.getElementById('ws-guia-cnt').value.trim(),
-                guiaCourier: document.getElementById('ws-guia-courier').value.trim(),
-                peso: document.getElementById('ws-peso').value.trim(),
-                series: seriesObj,
-                operator: db.operator || 'Desconocido',
-                date: new Date().toLocaleString('es-EC')
-            };
-
-            db.orders.unshift(newOrder);
-            db.pendingOrders = db.pendingOrders.filter(p => p.orderNum !== orderNum);
-
-            saveLocalStorage();
-            updateStats();
-            renderPendingOrdersDropdown();
-            renderInventoryTable();
-            renderOrdersTable();
-            resetWorkstationForm();
-
-            showToast(`Despacho registrado para pedido #${orderNum}.`, 'success');
-        }
-
-        function switchInventoryTab(tab) {
-            currentTab = tab;
-            ['pedidos', 'equipos', 'sims', 'esims', 'publicidad', 'pop'].forEach(t => {
-                const btn = document.getElementById(`tab-${t}`);
-                if (t === tab) {
-                    btn.className = 'px-4 py-2.5 text-blue-400 border-b-2 border-blue-500 font-semibold focus:outline-none';
-                } else {
-                    btn.className = 'px-4 py-2.5 text-slate-400 hover:text-slate-200 font-semibold focus:outline-none';
-                }
-            });
-            renderInventoryTable();
-        }
-
-        function renderInventoryTable() {
-            const tbody = document.getElementById('inventory-table-body');
-            tbody.innerHTML = '';
-
-            if (currentTab === 'pedidos') {
-                if (!db.pendingOrders || db.pendingOrders.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-500">No hay pedidos pre-cargados</td></tr>`;
-                    return;
-                }
-                db.pendingOrders.forEach(p => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-800/40 transition';
-                    const seriesCount = p.series ? p.series.length : 0;
-                    tr.innerHTML = `
-                        <td class="p-2 font-bold text-blue-400">#${p.orderNum}</td>
-                        <td class="p-2">${p.agency}</td>
-                        <td class="p-2"><span class="bg-blue-900/60 text-blue-300 border border-blue-700 text-[10px] px-2 py-0.5 rounded-full">${seriesCount} series asociadas</span></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } else {
-                const items = db[currentTab] || [];
-                if (items.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-500">No hay items pre-cargados en ${currentTab.toUpperCase()}</td></tr>`;
-                    return;
-                }
-                items.forEach(i => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-800/40 transition';
-                    const dup = findSeriesAssignment(i.serie);
-                    const statusBadge = dup 
-                        ? `<span class="bg-red-900/60 text-red-300 border border-red-700 text-[10px] px-2 py-0.5 rounded-full">Despachado (#${dup.orderNum})</span>`
-                        : `<span class="bg-emerald-900/60 text-emerald-300 border border-emerald-700 text-[10px] px-2 py-0.5 rounded-full">Disponible</span>`;
-
-                    tr.innerHTML = `
-                        <td class="p-2 font-mono text-slate-200">${i.serie}</td>
-                        <td class="p-2 text-slate-400">${i.detail || 'Sin detalle'}</td>
-                        <td class="p-2">${statusBadge}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
-        }
-
-        function renderOrdersTable() {
-            const tbody = document.getElementById('orders-table-body');
-            tbody.innerHTML = '';
-
-            if (!db.orders || db.orders.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No se registran despachos procesados</td></tr>`;
-                return;
-            }
-
-            db.orders.forEach(o => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-slate-800/40 transition';
-
-                const seriesSummary = [
-                    o.series.eqSerie ? `EQ: ${o.series.eqSerie}` : '',
-                    o.series.simSerie ? `SIM: ${o.series.simSerie}` : '',
-                    o.series.esimSerie ? `eSIM: ${o.series.esimSerie}` : '',
-                    o.series.pubSerie ? `PUB: ${o.series.pubSerie}` : '',
-                    o.series.popSerie ? `POP: ${o.series.popSerie}` : ''
-                ].filter(Boolean).join(' | ');
-
-                tr.innerHTML = `
-                    <td class="p-3 font-bold text-blue-400">${o.orderNum}</td>
-                    <td class="p-3">${o.agency}</td>
-                    <td class="p-3">${o.guiaCourier || '-'}</td>
-                    <td class="p-3 text-[11px] text-slate-400 max-w-xs truncate" title="${seriesSummary}">${seriesSummary || 'Sin series'}</td>
-                    <td class="p-3 text-slate-300">${o.operator}</td>
-                    <td class="p-3 text-slate-500 text-[11px]">${o.date}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function exportOrdersToExcel() {
-            if (typeof XLSX === 'undefined') {
-                showToast('Librería XLSX no cargada.', 'error');
-                return;
-            }
-            
-            if (!db.orders || db.orders.length === 0) {
-                showToast('No hay despachos para exportar.', 'warning');
-                return;
-            }
-
-            const data = (db.orders || []).map(o => ({
-                '# Pedido': o.orderNum,
-                'Agencia Destino': o.agency,
-                'Guía CNT': o.guiaCnt || '',
-                'Guía Courier': o.guiaCourier || '',
-                'Salida SAP': o.salidaSap || '',
-                'Peso (Kg)': o.peso || '',
-                'Serie Equipo': o.series ? o.series.eqSerie : '',
-                'Serie SIM': o.series ? o.series.simSerie : '',
-                'Serie eSIM': o.series ? o.series.esimSerie : '',
-                'Material Publicitario': o.series ? o.series.pubSerie : '',
-                'Material POP': o.series ? o.series.popSerie : '',
-                'Operario': o.operator,
-                'Fecha / Hora': o.date
-            }));
-
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Despachos');
-            XLSX.writeFile(wb, `Despachos_CNT_${new Date().toISOString().slice(0,10)}.xlsx`);
-
-            const totalLimpiados = db.orders.length;
-            db.orders = [];
-            
-            saveLocalStorage();
-            updateStats();
-            renderInventoryTable();
-            renderOrdersTable();
-
-            showToast(`Reporte exportado. Se limpiaron ${totalLimpiados} despachos del historial.`, 'success');
-        }
-    </script>
 </body>
 </html>
