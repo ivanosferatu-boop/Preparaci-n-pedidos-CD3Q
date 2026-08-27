@@ -275,7 +275,6 @@
                                 </div>
                                 <input type="text" id="ws-serie-equipo" oninput="validateFieldLive('equipo')" placeholder="Escanear IMEI o series separadas por comas..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-blue-500">
                                 <p id="msg-ws-equipo" class="text-[11px] hidden"></p>
-                                <div id="ws-series-tags-container-equipo" class="flex flex-wrap gap-1.5 pt-1"></div>
                             </div>
                             <!-- SIM Card ICCID -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
@@ -288,7 +287,6 @@
                                 </div>
                                 <input type="text" id="ws-serie-sim" oninput="validateFieldLive('sim')" placeholder="Escanear ICCID o series separadas por comas..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-cyan-500">
                                 <p id="msg-ws-sim" class="text-[11px] hidden"></p>
-                                <div id="ws-series-tags-container-sim" class="flex flex-wrap gap-1.5 pt-1"></div>
                             </div>
                             <!-- eSIM Serial -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
@@ -301,7 +299,6 @@
                                 </div>
                                 <input type="text" id="ws-serie-esim" oninput="validateFieldLive('esim')" placeholder="Escanear código eSIM o vouchers..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-indigo-500">
                                 <p id="msg-ws-esim" class="text-[11px] hidden"></p>
-                                <div id="ws-series-tags-container-esim" class="flex flex-wrap gap-1.5 pt-1"></div>
                             </div>
                             <!-- Material Publicitario -->
                             <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2">
@@ -314,7 +311,6 @@
                                 </div>
                                 <input type="text" id="ws-serie-publicidad" oninput="validateFieldLive('publicidad')" placeholder="Código de pack o afiche promocional..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500">
                                 <p id="msg-ws-publicidad" class="text-[11px] hidden"></p>
-                                <div id="ws-series-tags-container-publicidad" class="flex flex-wrap gap-1.5 pt-1"></div>
                             </div>
                         </div>
                     </div>
@@ -718,9 +714,6 @@
         let activeOperator = localStorage.getItem('cnt_operator') || 'Operario General';
         let currentCategoryView = 'equipos';
         let pendingImportData = null;
-        function formatCount(num) {
-            return num > 999 ? (num / 1000).toFixed(1) + 'k' : num;
-        }
         function loadLocalStorage() {
             const data = localStorage.getItem('cnt_inventory_db');
             if (data) {
@@ -755,10 +748,10 @@
             const elSim = document.getElementById('stat-sims');
             const elEsim = document.getElementById('stat-esims');
             const elPed = document.getElementById('stat-pedidos');
-            if (elEq) elEq.textContent = formatCount(eqAvail);
-            if (elSim) elSim.textContent = formatCount(simAvail);
-            if (elEsim) elEsim.textContent = formatCount(esimAvail);
-            if (elPed) elPed.textContent = formatCount(ordersCount);
+            if (elEq) elEq.textContent = eqAvail;
+            if (elSim) elSim.textContent = simAvail;
+            if (elEsim) elEsim.textContent = esimAvail;
+            if (elPed) elPed.textContent = ordersCount;
         }
         function logAuditEvent(action, detail) {
             if (!db.audit) db.audit = [];
@@ -981,8 +974,6 @@
             };
             reader.readAsArrayBuffer(file);
         }
-
-        // --- CORRECCIÓN EN CONFIRM IMPORT Y AUTOCOMPLETADO ---
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
                 showToast('No hay datos pendientes para importar.', 'warning');
@@ -992,25 +983,29 @@
             let addedCount = 0;
             if (target === 'pedidos') {
                 pendingImportData.forEach(row => {
-                    // Helper para obtener valores sin importar si la columna es mayúscula/minúscula
-                    const getVal = (keys) => {
-                        const foundKey = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
-                        return foundKey ? String(row[foundKey]).trim() : '';
-                    };
-
-                    const orderNum = getVal(['pedido sap', 'pedido', 'ordennum', 'orden', 'nro_pedido']);
-                    const agency = getVal(['descripción bodega', 'descripcion bodega', 'agencia', 'agency', 'bodega']);
-                    const serie = getVal(['serie', 'imei', 'iccid', 'codigo']);
-                    const tipoRaw = getVal(['tipo de lote', 'tipo', 'categoría', 'categoria', 'material']).toLowerCase();
-                    const descripcion = getVal(['descripción', 'descripcion', 'modelo', 'detalle']);
-
-                    // Detección automática del tipo de material
-                    let tipo = 'equipo';
-                    if (tipoRaw.includes('sim') && !tipoRaw.includes('esim')) tipo = 'sim';
-                    else if (tipoRaw.includes('esim')) tipo = 'esim';
-                    else if (tipoRaw.includes('pub') || tipoRaw.includes('mat') || tipoRaw.includes('promo')) tipo = 'publicidad';
-                    else if (descripcion.toLowerCase().includes('sim card')) tipo = 'sim';
-                    else if (descripcion.toLowerCase().includes('esim')) tipo = 'esim';
+                    const orderNum = String(
+                        row['Pedido SAP'] || row['pedido'] || row['Pedido'] || row['orderNum'] || row['orden'] || ''
+                    ).trim();
+                    
+                    const agency = String(
+                        row['Descripción Bodega'] || row['agencia'] || row['Agencia'] || row['agency'] || ''
+                    ).trim();
+                    
+                    const serie = String(
+                        row['Serie'] || row['serie'] || row['imei'] || row['iccid'] || ''
+                    ).trim();
+                    
+                    const tipo = String(
+                        row['TIPO DE LOTE'] || row['tipo'] || row['Tipo'] || 'equipo'
+                    ).trim();
+                    
+                    const codigoSap = String(row['Código SAP'] || row['codigoSap'] || '').trim();
+                    const descripcion = String(row['Descripción'] || row['descripcion'] || '').trim();
+                    const tecnologia = String(row['Tecnología'] || row['tecnologia'] || '').trim();
+                    const codigoOpen = String(row['Código OPEN CNT'] || row['codigoOpen'] || '').trim();
+                    const bodegaSap = String(row['Bodega SAP'] || row['bodegaSap'] || '').trim();
+                    const bodegaOpen = String(row['Bodega Open'] || row['bodegaOpen'] || '').trim();
+                    const canal = String(row['Canal'] || row['canal'] || '').trim();
 
                     if (orderNum) {
                         let existing = db.pendingOrders.find(p => p.orderNum === orderNum);
@@ -1018,14 +1013,23 @@
                             existing = { 
                                 orderNum, 
                                 agency: agency || 'Agencia General', 
-                                series: []
+                                series: [],
+                                metaSap: {
+                                    codigoSap,
+                                    descripcion,
+                                    tecnologia,
+                                    codigoOpen,
+                                    bodegaSap,
+                                    bodegaOpen,
+                                    canal
+                                }
                             };
                             db.pendingOrders.push(existing);
                         }
                         if (serie) {
                             existing.series.push({ 
                                 serie, 
-                                tipo: tipo,
+                                tipo: tipo.toLowerCase().includes('sim') ? 'sim' : 'equipo',
                                 detalleExtra: descripcion
                             });
                         }
@@ -1062,7 +1066,6 @@
             logAuditEvent('Carga Masiva', `Importados ${addedCount} registros en target: ${target}`);
             showToast(`¡Carga completada! Se importaron ${addedCount} registros.`, 'success');
         }
-
         // --- Core UI & Navigation Functions ---
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -1190,46 +1193,35 @@
             const badge = document.getElementById('pending-orders-count-badge');
             if (badge) badge.textContent = `${db.pendingOrders.length} Pedidos Pendientes`;
         }
-
-        // --- CORRECCIÓN EN SELECCIÓN Y POBLADO DE FORMULARIO ---
         function handleSelectPendingOrder(index) {
-            resetWorkstationForm();
             if (index === "" || index === null || index === undefined) return;
             const order = db.pendingOrders[index];
             if (!order) return;
-
             document.getElementById('ws-order-number').value = order.orderNum || '';
             document.getElementById('ws-agency').value = order.agency || '';
-
             if (order.series && Array.isArray(order.series)) {
-                // Filtra por tipo asegurando coincidencias flexibles
-                const equipos = order.series.filter(s => s.tipo === 'equipo' || s.tipo === 'equipos').map(s => s.serie).join(', ');
-                const sims = order.series.filter(s => s.tipo === 'sim' || s.tipo === 'sims').map(s => s.serie).join(', ');
-                const esims = order.series.filter(s => s.tipo === 'esim' || s.tipo === 'esims').map(s => s.serie).join(', ');
-                const publicidad = order.series.filter(s => s.tipo === 'publicidad' || s.tipo === 'pub').map(s => s.serie).join(', ');
-
+                const equipos = order.series.filter(s => s.tipo === 'equipo').map(s => s.serie).join(', ');
+                const sims = order.series.filter(s => s.tipo === 'sim').map(s => s.serie).join(', ');
+                const esims = order.series.filter(s => s.tipo === 'esim').map(s => s.serie).join(', ');
+                const publicidad = order.series.filter(s => s.tipo === 'publicidad').map(s => s.serie).join(', ');
                 if (equipos) document.getElementById('ws-serie-equipo').value = equipos;
                 if (sims) document.getElementById('ws-serie-sim').value = sims;
                 if (esims) document.getElementById('ws-serie-esim').value = esims;
                 if (publicidad) document.getElementById('ws-serie-publicidad').value = publicidad;
             }
-
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(validateFieldLive);
             showToast(`Pedido #${order.orderNum} auto-completado en formulario.`, 'info');
         }
-
         function validateFieldLive(fieldKey) {
             const input = document.getElementById(`ws-serie-${fieldKey}`);
             const targetBadge = document.getElementById(`badge-ws-${fieldKey}`);
             const msg = document.getElementById(`msg-ws-${fieldKey}`);
-            const tagsContainer = document.getElementById(`ws-series-tags-container-${fieldKey}`);
             if (!input || !targetBadge || !msg) return;
             const val = input.value.trim();
             if (!val) {
                 targetBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400";
                 targetBadge.textContent = "Sin Validar";
                 msg.classList.add('hidden');
-                if (tagsContainer) tagsContainer.innerHTML = '';
                 return;
             }
             const series = val.split(',').map(s => s.trim()).filter(Boolean);
@@ -1237,27 +1229,11 @@
             
             let allAvailable = true;
             let foundCount = 0;
-            
-            if (tagsContainer) tagsContainer.innerHTML = '';
             series.forEach(s => {
                 const item = (db[dbCategory] || []).find(i => i.serie === s);
-                let tagClass = "bg-slate-800 text-slate-300 border-slate-700";
                 if (item) {
                     foundCount++;
-                    if (item.status === 'Despachado') {
-                        allAvailable = false;
-                        tagClass = "bg-rose-950 text-rose-300 border-rose-800";
-                    } else {
-                        tagClass = "bg-emerald-950 text-emerald-300 border-emerald-800";
-                    }
-                } else {
-                    tagClass = "bg-amber-950 text-amber-300 border-amber-800";
-                }
-                if (tagsContainer) {
-                    const tag = document.createElement('span');
-                    tag.className = `text-[10px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${tagClass}`;
-                    tag.innerHTML = `<span>${s}</span><button type="button" onclick="removeSeriesTag('${fieldKey}', '${s}')" class="hover:text-white">&times;</button>`;
-                    tagsContainer.appendChild(tag);
+                    if (item.status === 'Despachado') allAvailable = false;
                 }
             });
             if (foundCount === series.length && allAvailable) {
@@ -1279,14 +1255,6 @@
                 msg.textContent = `ℹ️ Las series se registrarán y despacharán directamente.`;
                 msg.classList.remove('hidden');
             }
-        }
-        function removeSeriesTag(fieldKey, serieToRemove) {
-            const input = document.getElementById(`ws-serie-${fieldKey}`);
-            if (!input) return;
-            let series = input.value.split(',').map(s => s.trim()).filter(Boolean);
-            series = series.filter(s => s !== serieToRemove);
-            input.value = series.join(', ');
-            validateFieldLive(fieldKey);
         }
         function handleDispatchSubmit(e) {
             e.preventDefault();
@@ -1359,10 +1327,8 @@
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(f => {
                 const b = document.getElementById(`badge-ws-${f}`);
                 const m = document.getElementById(`msg-ws-${f}`);
-                const tc = document.getElementById(`ws-series-tags-container-${f}`);
                 if (b) { b.className = "text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400"; b.textContent = "Sin Validar"; }
                 if (m) m.classList.add('hidden');
-                if (tc) tc.innerHTML = '';
             });
         }
         function runGlobalValidation() {
@@ -1423,7 +1389,7 @@
                 i.serie.toLowerCase().includes(searchVal) || 
                 (i.detail && i.detail.toLowerCase().includes(searchVal))
             );
-            document.getElementById('cat-count-badge').textContent = `${formatCount(filtered.length)} Registros`;
+            document.getElementById('cat-count-badge').textContent = `${filtered.length} Registros`;
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No hay registros cargados en esta categoría.</td></tr>`;
                 return;
