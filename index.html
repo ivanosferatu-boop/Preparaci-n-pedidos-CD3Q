@@ -986,7 +986,6 @@
             };
             reader.readAsArrayBuffer(file);
         }
-
         // Importación masiva con mapeo inteligente de columnas
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
@@ -998,7 +997,6 @@
             let addedCount = 0;
             
             if (!db.pendingOrders) db.pendingOrders = [];
-
             // Helper para extraer campos evaluando múltiples nombres de columna comunes
             const extractValue = (row, candidateKeys) => {
                 if (!row || typeof row !== 'object') return '';
@@ -1017,7 +1015,6 @@
                 }
                 return '';
             };
-
             if (target === 'pedidos') {
                 pendingImportData.forEach(row => {
                     const orderNum = extractValue(row, ['pedido sap', 'pedido', 'order', 'orden', 'nro_pedido', 'documento']);
@@ -1050,6 +1047,19 @@
                             
                             if (!existingOrder.series.some(s => s.serie === serie)) {
                                 existingOrder.series.push({ serie: serie, tipo: itemType });
+                            }
+                            
+                            // Integración: registrar las series también en el Inventario Base como Disponibles
+                            const invCategory = itemType === 'equipo' ? 'equipos' : itemType;
+                            if (!db[invCategory]) db[invCategory] = [];
+                            if (!db[invCategory].some(i => i.serie === serie)) {
+                                db[invCategory].push({
+                                    serie: serie,
+                                    detail: `Pedido #${orderNum} - ${agency || 'Agencia General'}`,
+                                    status: 'Disponible',
+                                    assignedOrder: null,
+                                    date: new Date().toLocaleDateString('es-EC')
+                                });
                             }
                         }
                     }
@@ -1097,7 +1107,6 @@
             logAuditEvent('Carga Masiva', `Importados ${addedCount} registros en categoría: ${target}`);
             showToast(`¡Carga completada! Se procesaron ${addedCount} registros correctamente.`, addedCount > 0 ? 'success' : 'warning');
         }
-
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1589,6 +1598,7 @@
                             renderCategoryTable();
                             renderOrdersTable();
                             renderAuditLog();
+                            updateFirebaseStatusUI();
                         }
                     },
                     (err) => {
