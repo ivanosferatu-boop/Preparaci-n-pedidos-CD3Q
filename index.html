@@ -109,10 +109,8 @@
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
-
     <!-- Toast Notification Overlay Container -->
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
-
     <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <!-- Logo & Title -->
@@ -143,7 +141,6 @@
             </div>
         </div>
     </header>
-
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <!-- KPI Metrics Grid -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -184,7 +181,6 @@
                 </div>
             </div>
         </div>
-
         <nav class="flex space-x-2 border-b border-slate-800 overflow-x-auto pb-1">
             <button id="tab-btn-workstation" onclick="switchTab('workstation')" class="tab-btn flex items-center space-x-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-indigo-600 text-white shadow-md transition">
                 <i class="fa-solid fa-cash-register"></i>
@@ -211,7 +207,6 @@
                 <span>Bitácora de Control</span>
             </button>
         </nav>
-
         <section id="view-workstation" class="tab-content space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-3">
@@ -364,7 +359,6 @@
                 </form>
             </div>
         </section>
-
         <section id="view-validator" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="border-b border-slate-800 pb-4">
@@ -383,7 +377,6 @@
                 <div id="validator-result" class="hidden"></div>
             </div>
         </section>
-
         <section id="view-inventory" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800 pb-4 gap-4">
@@ -426,7 +419,6 @@
                 </div>
             </div>
         </section>
-
         <section id="view-orders" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -464,7 +456,6 @@
                 </div>
             </div>
         </section>
-
         <section id="view-import" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="border-b border-slate-800 pb-4">
@@ -530,7 +521,6 @@
                 </div>
             </div>
         </section>
-
         <section id="view-audit" class="tab-content hidden space-y-6">
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -560,7 +550,6 @@
             </div>
         </section>
     </main>
-
     <!-- Modal: Confirm Action -->
     <div id="modal-confirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
@@ -579,7 +568,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Register Operator -->
     <div id="modal-operator" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -594,7 +582,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Generar Nuevo Pedido Pendiente -->
     <div id="modal-new-order" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -622,7 +609,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Add Item to Inventory -->
     <div id="modal-add-item" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
@@ -654,7 +640,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modal: Firebase Help & Status / Config Settings -->
     <div id="modal-firebase-help" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-xl shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
@@ -716,7 +701,6 @@
             </div>
         </div>
     </div>
-
     <script>
         // Global Application Database & State
         let db = {
@@ -732,7 +716,6 @@
         let activeOperator = localStorage.getItem('cnt_operator') || 'Operario General';
         let currentCategoryView = 'equipos';
         let pendingImportData = null;
-
         function loadLocalStorage() {
             const data = localStorage.getItem('cnt_inventory_db');
             if (data) {
@@ -752,14 +735,12 @@
                 }
             }
         }
-
         function saveLocalStorage(syncToCloud = true) {
             localStorage.setItem('cnt_inventory_db', JSON.stringify(db));
             if (syncToCloud) {
                 syncToFirebaseCloud();
             }
         }
-
         function updateStats() {
             const eqAvail = (db.equipos || []).filter(i => i.status !== 'Despachado').length;
             const simAvail = (db.sim || []).filter(i => i.status !== 'Despachado').length;
@@ -776,7 +757,6 @@
             if (elEsim) elEsim.textContent = esimAvail;
             if (elPed) elPed.textContent = ordersCount;
         }
-
         function logAuditEvent(action, detail) {
             if (!db.audit) db.audit = [];
             db.audit.unshift({
@@ -789,7 +769,6 @@
             saveLocalStorage(true);
             renderAuditLog();
         }
-
         function renderAuditLog() {
             const tbody = document.getElementById('audit-table-body');
             if (!tbody) return;
@@ -811,7 +790,6 @@
                 tbody.appendChild(tr);
             });
         }
-
         function renderOrdersTable() {
             const tbody = document.getElementById('orders-table-body');
             if (!tbody) return;
@@ -853,7 +831,6 @@
                 tbody.appendChild(tr);
             });
         }
-
         function deleteOrder(index) {
             showConfirmDialog('¿Está seguro de eliminar este registro de despacho?', () => {
                 const removed = db.orders.splice(index, 1)[0];
@@ -864,7 +841,6 @@
                 showToast('Registro de despacho eliminado.', 'info');
             });
         }
-
         function deleteSelectedPendingOrder() {
             const select = document.getElementById('ws-select-pending-order');
             const val = select.value;
@@ -881,14 +857,12 @@
                 showToast('Pedido pendiente eliminado.', 'info');
             });
         }
-
         function openAddItemModal() {
             document.getElementById('modal-add-item').classList.remove('hidden');
         }
         function closeAddItemModal() {
             document.getElementById('modal-add-item').classList.add('hidden');
         }
-
         function saveSingleItem() {
             const category = document.getElementById('add-item-category').value;
             const serie = document.getElementById('add-item-serie').value.trim();
@@ -922,7 +896,6 @@
             logAuditEvent('Ítem Agregado', `Agregado a ${category}: ${serie}`);
             showToast(`Ítem ${serie} registrado correctamente.`, 'success');
         }
-
         function confirmDeleteInventoryItem(category, index) {
             showConfirmDialog('¿Está seguro de eliminar este ítem del inventario?', () => {
                 const removed = db[category].splice(index, 1)[0];
@@ -933,7 +906,6 @@
                 showToast('Ítem eliminado del inventario.', 'info');
             });
         }
-
         function exportInventoryToExcel() {
             if (typeof XLSX === 'undefined') {
                 showToast('Librería Excel no cargada.', 'error');
@@ -955,7 +927,6 @@
             logAuditEvent('Exportación Excel', 'Exportado inventario completo a Excel');
             showToast('Inventario exportado a Excel.', 'success');
         }
-
         function exportOrdersToExcel() {
             if (typeof XLSX === 'undefined') {
                 showToast('Librería Excel no cargada.', 'error');
@@ -982,7 +953,6 @@
             logAuditEvent('Exportación Excel', 'Exportado histórico de despachos a Excel');
             showToast('Despachos exportados a Excel.', 'success');
         }
-
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1011,7 +981,6 @@
             };
             reader.readAsArrayBuffer(file);
         }
-
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
                 showToast('No hay datos pendientes para importar.', 'warning');
@@ -1019,32 +988,43 @@
             }
             const target = document.querySelector('input[name="import-target"]:checked').value;
             let addedCount = 0;
+
+            const getVal = (row, candidateKeys) => {
+                const keys = Object.keys(row);
+                for (const key of keys) {
+                    const cleanKey = key.trim().toLowerCase();
+                    if (candidateKeys.some(ck => cleanKey.includes(ck.toLowerCase()))) {
+                        return row[key];
+                    }
+                }
+                return '';
+            };
             
             if (target === 'pedidos') {
                 pendingImportData.forEach(row => {
                     const orderNum = String(
-                        row['Pedido SAP'] || row['pedido'] || row['Pedido'] || row['orderNum'] || row['orden'] || ''
+                        getVal(row, ['pedido sap', 'pedido', 'order', 'orden']) || ''
                     ).trim();
                     
                     const agency = String(
-                        row['Descripción Bodega'] || row['agencia'] || row['Agencia'] || row['agency'] || ''
+                        getVal(row, ['descripción bodega', 'descripcion bodega', 'agencia', 'bodega', 'agency']) || ''
                     ).trim();
                     
                     const serie = String(
-                        row['Serie'] || row['serie'] || row['imei'] || row['iccid'] || ''
+                        getVal(row, ['serie', 'imei', 'iccid', 'codigo']) || ''
                     ).trim();
                     
                     const tipo = String(
-                        row['TIPO DE LOTE'] || row['tipo'] || row['Tipo'] || 'equipo'
+                        getVal(row, ['tipo de lote', 'tipo']) || 'equipo'
                     ).trim();
                     
-                    const codigoSap = String(row['Código SAP'] || row['codigoSap'] || '').trim();
-                    const descripcion = String(row['Descripción'] || row['descripcion'] || '').trim();
-                    const tecnologia = String(row['Tecnología'] || row['tecnologia'] || '').trim();
-                    const codigoOpen = String(row['Código OPEN CNT'] || row['codigoOpen'] || '').trim();
-                    const bodegaSap = String(row['Bodega SAP'] || row['bodegaSap'] || '').trim();
-                    const bodegaOpen = String(row['Bodega Open'] || row['bodegaOpen'] || '').trim();
-                    const canal = String(row['Canal'] || row['canal'] || '').trim();
+                    const codigoSap = String(getVal(row, ['código sap', 'codigo sap']) || '').trim();
+                    const descripcion = String(getVal(row, ['descripción', 'descripcion', 'detalle']) || '').trim();
+                    const tecnologia = String(getVal(row, ['tecnología', 'tecnologia']) || '').trim();
+                    const codigoOpen = String(getVal(row, ['código open', 'codigo open']) || '').trim();
+                    const bodegaSap = String(getVal(row, ['bodega sap']) || '').trim();
+                    const bodegaOpen = String(getVal(row, ['bodega open']) || '').trim();
+                    const canal = String(getVal(row, ['canal']) || '').trim();
                     
                     if (orderNum) {
                         let existing = db.pendingOrders.find(p => p.orderNum === orderNum);
@@ -1089,12 +1069,10 @@
                 });
             } else {
                 pendingImportData.forEach(row => {
-                    const serie = String(
-                        row['Serie'] || row['serie'] || row['imei'] || row['ICCID'] || row['iccid'] || row['codigo'] || Object.values(row)[0] || ''
-                    ).trim();
-                    const detail = String(
-                        row['Descripción'] || row['detalle'] || row['Detalle'] || row['modelo'] || row['Modelo'] || ''
-                    ).trim();
+                    const rawSerie = getVal(row, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial']) || Object.values(row)[0] || '';
+                    const serie = String(rawSerie).trim();
+                    const rawDetail = getVal(row, ['descripción', 'descripcion', 'detalle', 'modelo', 'nombre', 'item']) || '';
+                    const detail = String(rawDetail).trim();
                     
                     if (serie && !db[target].some(i => i.serie === serie)) {
                         db[target].push({
@@ -1121,7 +1099,6 @@
             logAuditEvent('Carga Masiva', `Importados ${addedCount} registros en target: ${target}`);
             showToast(`¡Carga completada! Se importaron ${addedCount} registros.`, 'success');
         }
-
         // --- Core UI & Navigation Functions ---
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -1141,7 +1118,6 @@
             if (tabId === 'orders') renderOrdersTable();
             if (tabId === 'audit') renderAuditLog();
         }
-
         function switchCategory(catId) {
             currentCategoryView = catId;
             document.querySelectorAll('.cat-btn').forEach(btn => {
@@ -1153,7 +1129,6 @@
             }
             renderCategoryTable();
         }
-
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -1187,7 +1162,6 @@
                 setTimeout(() => toast.remove(), 300);
             }, 4500);
         }
-
         function showConfirmDialog(message, onConfirm) {
             const modal = document.getElementById('modal-confirm');
             document.getElementById('confirm-modal-text').textContent = message;
@@ -1205,7 +1179,6 @@
             cancelBtn.onclick = () => { cleanup(); };
             modal.classList.remove('hidden');
         }
-
         // --- Operator Modal Logic ---
         function openOperatorModal() { document.getElementById('modal-operator').classList.remove('hidden'); }
         function closeOperatorModal() { document.getElementById('modal-operator').classList.add('hidden'); }
@@ -1224,10 +1197,8 @@
             logAuditEvent('Cambio de Operario', `Operario activo asignado: ${activeOperator}`);
             showToast(`Operario guardado como: ${activeOperator}`, 'success');
         }
-
         function openNewOrderModal() { document.getElementById('modal-new-order').classList.remove('hidden'); }
         function closeNewOrderModal() { document.getElementById('modal-new-order').classList.add('hidden'); }
-
         function saveNewPendingOrder() {
             const num = document.getElementById('new-order-number').value.trim();
             const agency = document.getElementById('new-order-agency').value.trim();
@@ -1257,7 +1228,6 @@
             document.getElementById('new-order-agency').value = '';
             document.getElementById('new-order-series').value = '';
         }
-
         function renderPendingOrdersDropdown() {
             const select = document.getElementById('ws-select-pending-order');
             select.innerHTML = '<option value="">-- Seleccionar Pedido Cargado --</option>';
@@ -1270,7 +1240,6 @@
             const badge = document.getElementById('pending-orders-count-badge');
             if (badge) badge.textContent = `${db.pendingOrders.length} Pedidos Pendientes`;
         }
-
         function handleSelectPendingOrder(index) {
             if (index === "" || index === null || index === undefined) return;
             const order = db.pendingOrders[index];
@@ -1299,7 +1268,6 @@
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(validateFieldLive);
             showToast(`Pedido #${order.orderNum} auto-completado en formulario.`, 'info');
         }
-
         function validateFieldLive(fieldKey) {
             const input = document.getElementById(`ws-serie-${fieldKey}`);
             const targetBadge = document.getElementById(`badge-ws-${fieldKey}`);
@@ -1348,7 +1316,6 @@
                 msg.classList.remove('hidden');
             }
         }
-
         function handleDispatchSubmit(e) {
             e.preventDefault();
             const orderNum = document.getElementById('ws-order-number').value.trim();
@@ -1423,7 +1390,6 @@
             logAuditEvent('Despacho Exitoso', `Registrado pedido #${orderNum} para ${agency} por ${activeOperator}`);
             showToast(`¡Pedido #${orderNum} registrado y despachado con éxito!`, 'success');
         }
-
         function resetWorkstationForm() {
             document.getElementById('form-workstation').reset();
             ['equipo', 'sim', 'esim', 'publicidad'].forEach(f => {
@@ -1433,7 +1399,6 @@
                 if (m) m.classList.add('hidden');
             });
         }
-
         function runGlobalValidation() {
             const query = document.getElementById('validator-input').value.trim();
             const container = document.getElementById('validator-result');
@@ -1487,7 +1452,6 @@
             html += `</div>`;
             container.innerHTML = html;
         }
-
         function renderCategoryTable() {
             const tbody = document.getElementById('inventory-table-body');
             const searchVal = document.getElementById('inventory-search').value.toLowerCase().trim();
@@ -1529,7 +1493,6 @@
                 tbody.appendChild(tr);
             });
         }
-
         function updateFirebaseStatusUI() {
             const dot = document.getElementById('sync-status-dot');
             const text = document.getElementById('sync-status-text');
@@ -1560,14 +1523,12 @@
                 if (details) details.textContent = "⚠️ Firebase configurado pero no conectado.\nBase de datos no disponible o error de red. Operando en modo local para evitar bloqueos.";
             }
         }
-
         function toggleFirebaseSyncPreference() {
             const curr = window.firebaseSyncEnabled;
             localStorage.setItem('cnt_firebase_enabled', (!curr).toString());
             showToast(!curr ? 'Sincronización Cloud ACTIVADA. Reiniciando conector...' : 'Modo Local ACTIVADO.', 'info');
             setTimeout(() => window.location.reload(), 1000);
         }
-
         function saveCustomFirebaseConfig() {
             const projectId = document.getElementById('cfg-project-id').value.trim();
             const apiKey = document.getElementById('cfg-api-key').value.trim();
@@ -1590,13 +1551,11 @@
             showToast('Configuración Firebase actualizada. Recargando...', 'success');
             setTimeout(() => window.location.reload(), 1000);
         }
-
         function syncToFirebaseCloud() {
             if (window.firebaseServices && window.firebaseSyncEnabled) {
                 window.firebaseServices.saveState(db);
             }
         }
-
         function openFirebaseHelpModal() {
             const cfg = window.firebaseConfig || {};
             document.getElementById('cfg-project-id').value = cfg.projectId || '';
@@ -1606,11 +1565,9 @@
             updateFirebaseStatusUI();
             document.getElementById('modal-firebase-help').classList.remove('hidden');
         }
-
         function closeFirebaseHelpModal() {
             document.getElementById('modal-firebase-help').classList.add('hidden');
         }
-
         window.onload = function() {
             loadLocalStorage();
             
