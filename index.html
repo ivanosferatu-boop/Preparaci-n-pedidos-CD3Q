@@ -987,7 +987,7 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // --- CORRECCIÓN INTEGRADA: confirmImport() ---
+        // Importación masiva con mapeo inteligente de columnas
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
                 showToast('No hay datos disponibles para importar.', 'warning');
@@ -999,6 +999,7 @@
             
             if (!db.pendingOrders) db.pendingOrders = [];
 
+            // Helper para extraer campos evaluando múltiples nombres de columna comunes
             const extractValue = (row, candidateKeys) => {
                 if (!row || typeof row !== 'object') return '';
                 const keys = Object.keys(row);
@@ -1224,8 +1225,7 @@
             document.getElementById('new-order-agency').value = '';
             document.getElementById('new-order-series').value = '';
         }
-
-        // --- RENDERIZADO DEL DROPDOWN DE PEDIDOS ---
+        
         function renderPendingOrdersDropdown() {
             const select = document.getElementById('ws-select-pending-order');
             if (!select) return;
@@ -1240,7 +1240,6 @@
             const badge = document.getElementById('pending-orders-count-badge');
             if (badge) badge.textContent = `${list.length} Pedidos Pendientes`;
         }
-
         function handleSelectPendingOrder(index) {
             if (index === "" || index === null || index === undefined) return;
             const order = db.pendingOrders[index];
