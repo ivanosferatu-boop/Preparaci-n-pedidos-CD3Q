@@ -716,7 +716,7 @@
         let activeOperator = localStorage.getItem('cnt_operator') || 'Operario General';
         let currentCategoryView = 'equipos';
         let pendingImportData = null;
-
+        
         function loadLocalStorage() {
             const data = localStorage.getItem('cnt_inventory_db');
             if (data) {
@@ -954,8 +954,7 @@
             logAuditEvent('Exportación Excel', 'Exportado histórico de despachos a Excel');
             showToast('Despachos exportados a Excel.', 'success');
         }
-
-        // Manejo y parseo flexible de archivos subidos
+        
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -988,7 +987,7 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // Algoritmo de extracción flexible y confirmación de importación
+        // --- CORRECCIÓN INTEGRADA: confirmImport() ---
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
                 showToast('No hay datos disponibles para importar.', 'warning');
@@ -997,13 +996,13 @@
             
             const target = document.querySelector('input[name="import-target"]:checked').value;
             let addedCount = 0;
+            
+            if (!db.pendingOrders) db.pendingOrders = [];
 
-            // Función de extracción por coincidencia difusa de llaves de encabezado
             const extractValue = (row, candidateKeys) => {
                 if (!row || typeof row !== 'object') return '';
                 const keys = Object.keys(row);
                 
-                // 1. Coincidencia por nombre aproximado
                 for (const key of keys) {
                     const cleanKey = key.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                     for (const ck of candidateKeys) {
@@ -1034,6 +1033,7 @@
                                 series: [] 
                             };
                             db.pendingOrders.push(existingOrder);
+                            addedCount++;
                         }
                         
                         if (serie) {
@@ -1051,12 +1051,10 @@
                                 existingOrder.series.push({ serie: serie, tipo: itemType });
                             }
                         }
-                        addedCount++;
                     }
                 });
             } else {
                 pendingImportData.forEach(row => {
-                    // Intenta obtener por claves candidatas, si falla asigna la primera columna
                     let serie = extractValue(row, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial', 'identificador']);
                     if (!serie) {
                         const vals = Object.values(row);
@@ -1099,7 +1097,6 @@
             showToast(`¡Carga completada! Se procesaron ${addedCount} registros correctamente.`, addedCount > 0 ? 'success' : 'warning');
         }
 
-        // --- Core UI & Navigation Functions ---
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1179,7 +1176,6 @@
             cancelBtn.onclick = () => { cleanup(); };
             modal.classList.remove('hidden');
         }
-        // --- Operator Modal Logic ---
         function openOperatorModal() { document.getElementById('modal-operator').classList.remove('hidden'); }
         function closeOperatorModal() { document.getElementById('modal-operator').classList.add('hidden'); }
         
@@ -1228,18 +1224,23 @@
             document.getElementById('new-order-agency').value = '';
             document.getElementById('new-order-series').value = '';
         }
+
+        // --- RENDERIZADO DEL DROPDOWN DE PEDIDOS ---
         function renderPendingOrdersDropdown() {
             const select = document.getElementById('ws-select-pending-order');
+            if (!select) return;
             select.innerHTML = '<option value="">-- Seleccionar Pedido Cargado --</option>';
-            db.pendingOrders.forEach((o, idx) => {
+            const list = db.pendingOrders || [];
+            list.forEach((o, idx) => {
                 const opt = document.createElement('option');
                 opt.value = idx;
                 opt.textContent = `Pedido #${o.orderNum} - ${o.agency} (${o.series ? o.series.length : 0} series vinculadas)`;
                 select.appendChild(opt);
             });
             const badge = document.getElementById('pending-orders-count-badge');
-            if (badge) badge.textContent = `${db.pendingOrders.length} Pedidos Pendientes`;
+            if (badge) badge.textContent = `${list.length} Pedidos Pendientes`;
         }
+
         function handleSelectPendingOrder(index) {
             if (index === "" || index === null || index === undefined) return;
             const order = db.pendingOrders[index];
@@ -1248,7 +1249,6 @@
             document.getElementById('ws-order-number').value = order.orderNum || '';
             document.getElementById('ws-agency').value = order.agency || '';
             
-            // Limpiar inputs antes de mapear
             document.getElementById('ws-serie-equipo').value = '';
             document.getElementById('ws-serie-sim').value = '';
             document.getElementById('ws-serie-esim').value = '';
@@ -1348,7 +1348,6 @@
             
             db.orders.unshift(newDispatch);
             
-            // Mark or register multiple series in inventory as Dispatched
             const bindSeries = (rawStr, category) => {
                 if (!rawStr) return;
                 const arr = rawStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -1374,7 +1373,6 @@
             bindSeries(esimSerie, 'esim');
             bindSeries(pubSerie, 'publicidad');
             
-            // Remove from pending list if matching
             const pendingIndex = db.pendingOrders.findIndex(p => p.orderNum === orderNum);
             if (pendingIndex !== -1) {
                 db.pendingOrders.splice(pendingIndex, 1);
