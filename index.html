@@ -121,7 +121,7 @@
                 <div>
                     <h1 class="text-base font-bold text-slate-100 leading-tight flex items-center gap-2">
                         Sistema de Control de Despachos
-                        <span class="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-semibold">v3.5</span>
+                        <span class="text-[10px] bg-cyan-950 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-semibold">v3.6</span>
                     </h1>
                     <p class="text-xs text-slate-400">Corporación Nacional de Telecomunicaciones</p>
                 </div>
@@ -506,8 +506,8 @@
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-600 mb-3"></i>
                     <p class="text-sm font-medium text-slate-300 mb-1">Arrastre su archivo Excel (.xlsx) o CSV aquí</p>
                     <p class="text-xs text-slate-500 mb-4">
-                        Para pedidos y agencias, se recomiendan las columnas: 
-                        <code class="text-indigo-400">Pedido SAP</code>, <code class="text-indigo-400">Descripción Bodega</code>, <code class="text-indigo-400">Serie</code>, <code class="text-indigo-400">Descripción</code>
+                        Admite encabezados flexibles: 
+                        <code class="text-indigo-400">Serie</code>, <code class="text-indigo-400">IMEI</code>, <code class="text-indigo-400">ICCID</code>, <code class="text-indigo-400">Pedido SAP</code>, <code class="text-indigo-400">Agencia</code>, etc.
                     </p>
                     <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
                     <button onclick="document.getElementById('excel-file-input').click()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
@@ -716,6 +716,7 @@
         let activeOperator = localStorage.getItem('cnt_operator') || 'Operario General';
         let currentCategoryView = 'equipos';
         let pendingImportData = null;
+
         function loadLocalStorage() {
             const data = localStorage.getItem('cnt_inventory_db');
             if (data) {
@@ -953,6 +954,8 @@
             logAuditEvent('Exportación Excel', 'Exportado histórico de despachos a Excel');
             showToast('Despachos exportados a Excel.', 'success');
         }
+
+        // Manejo y parseo flexible de archivos subidos
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -964,104 +967,88 @@
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
                     const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-                    if (json.length === 0) {
-                        showToast('El archivo cargado no contiene filas.', 'warning');
+                    
+                    if (!json || json.length === 0) {
+                        showToast('El archivo cargado no contiene filas utilizables.', 'warning');
                         return;
                     }
+                    
                     pendingImportData = json;
                     const target = document.querySelector('input[name="import-target"]:checked').value;
                     const preview = document.getElementById('import-preview');
                     const content = document.getElementById('import-preview-content');
+                    
                     preview.classList.remove('hidden');
-                    content.textContent = `Target: ${target.toUpperCase()} | Total filas leídas: ${json.length}\n\nPrimera(s) fila(s) de muestra:\n` + JSON.stringify(json.slice(0, 3), null, 2);
+                    content.textContent = `Target: ${target.toUpperCase()} | Filas procesadas: ${json.length}\n\nDetalle de muestra (Primeras filas):\n` + JSON.stringify(json.slice(0, 3), null, 2);
                     showToast(`Archivo procesado: ${json.length} filas listas para importar.`, 'info');
                 } catch (err) {
-                    showToast('Error al leer el archivo Excel/CSV: ' + err.message, 'error');
+                    showToast('Error al procesar el archivo Excel: ' + err.message, 'error');
                 }
             };
             reader.readAsArrayBuffer(file);
         }
+
+        // Algoritmo de extracción flexible y confirmación de importación
         function confirmImport() {
             if (!pendingImportData || pendingImportData.length === 0) {
-                showToast('No hay datos pendientes para importar.', 'warning');
+                showToast('No hay datos disponibles para importar.', 'warning');
                 return;
             }
+            
             const target = document.querySelector('input[name="import-target"]:checked').value;
             let addedCount = 0;
 
-            const getVal = (row, candidateKeys) => {
+            // Función de extracción por coincidencia difusa de llaves de encabezado
+            const extractValue = (row, candidateKeys) => {
+                if (!row || typeof row !== 'object') return '';
                 const keys = Object.keys(row);
+                
+                // 1. Coincidencia por nombre aproximado
                 for (const key of keys) {
-                    const cleanKey = key.trim().toLowerCase();
-                    if (candidateKeys.some(ck => cleanKey.includes(ck.toLowerCase()))) {
-                        return row[key];
+                    const cleanKey = key.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    for (const ck of candidateKeys) {
+                        const cleanCk = ck.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        if (cleanKey === cleanCk || cleanKey.includes(cleanCk)) {
+                            if (row[key] !== null && row[key] !== undefined) {
+                                return String(row[key]).trim();
+                            }
+                        }
                     }
                 }
                 return '';
             };
-            
+
             if (target === 'pedidos') {
                 pendingImportData.forEach(row => {
-                    const orderNum = String(
-                        getVal(row, ['pedido sap', 'pedido', 'order', 'orden']) || ''
-                    ).trim();
-                    
-                    const agency = String(
-                        getVal(row, ['descripción bodega', 'descripcion bodega', 'agencia', 'bodega', 'agency']) || ''
-                    ).trim();
-                    
-                    const serie = String(
-                        getVal(row, ['serie', 'imei', 'iccid', 'codigo']) || ''
-                    ).trim();
-                    
-                    const tipo = String(
-                        getVal(row, ['tipo de lote', 'tipo']) || 'equipo'
-                    ).trim();
-                    
-                    const codigoSap = String(getVal(row, ['código sap', 'codigo sap']) || '').trim();
-                    const descripcion = String(getVal(row, ['descripción', 'descripcion', 'detalle']) || '').trim();
-                    const tecnologia = String(getVal(row, ['tecnología', 'tecnologia']) || '').trim();
-                    const codigoOpen = String(getVal(row, ['código open', 'codigo open']) || '').trim();
-                    const bodegaSap = String(getVal(row, ['bodega sap']) || '').trim();
-                    const bodegaOpen = String(getVal(row, ['bodega open']) || '').trim();
-                    const canal = String(getVal(row, ['canal']) || '').trim();
+                    const orderNum = extractValue(row, ['pedido sap', 'pedido', 'order', 'orden', 'nro_pedido', 'documento']);
+                    const agency = extractValue(row, ['descripcion bodega', 'agencia', 'bodega', 'destinatario', 'destino', 'oficina']);
+                    const serie = extractValue(row, ['serie', 'imei', 'iccid', 'codigo', 'serial', 'sn']);
+                    const tipoStr = extractValue(row, ['tipo', 'clase', 'material', 'descripcion']);
                     
                     if (orderNum) {
-                        let existing = db.pendingOrders.find(p => p.orderNum === orderNum);
-                        if (!existing) {
-                            existing = { 
-                                orderNum, 
+                        let existingOrder = db.pendingOrders.find(p => p.orderNum === orderNum);
+                        if (!existingOrder) {
+                            existingOrder = { 
+                                orderNum: orderNum, 
                                 agency: agency || 'Agencia General', 
-                                series: [],
-                                metaSap: {
-                                    codigoSap,
-                                    descripcion,
-                                    tecnologia,
-                                    codigoOpen,
-                                    bodegaSap,
-                                    bodegaOpen,
-                                    canal
-                                }
+                                series: [] 
                             };
-                            db.pendingOrders.push(existing);
+                            db.pendingOrders.push(existingOrder);
                         }
+                        
                         if (serie) {
                             let itemType = 'equipo';
-                            const typeStr = (tipo + ' ' + descripcion).toLowerCase();
-                            if (typeStr.includes('sim') || typeStr.includes('iccid')) {
+                            const checkLower = (tipoStr + ' ' + serie).toLowerCase();
+                            if (checkLower.includes('sim') || checkLower.includes('iccid') || serie.startsWith('89')) {
                                 itemType = 'sim';
-                            } else if (typeStr.includes('esim')) {
+                            } else if (checkLower.includes('esim')) {
                                 itemType = 'esim';
-                            } else if (typeStr.includes('pub') || typeStr.includes('material')) {
+                            } else if (checkLower.includes('pub') || checkLower.includes('material')) {
                                 itemType = 'publicidad';
                             }
                             
-                            if (!existing.series.some(s => s.serie === serie)) {
-                                existing.series.push({ 
-                                    serie, 
-                                    tipo: itemType,
-                                    detalleExtra: descripcion
-                                });
+                            if (!existingOrder.series.some(s => s.serie === serie)) {
+                                existingOrder.series.push({ serie: serie, tipo: itemType });
                             }
                         }
                         addedCount++;
@@ -1069,20 +1056,32 @@
                 });
             } else {
                 pendingImportData.forEach(row => {
-                    const rawSerie = getVal(row, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial']) || Object.values(row)[0] || '';
-                    const serie = String(rawSerie).trim();
-                    const rawDetail = getVal(row, ['descripción', 'descripcion', 'detalle', 'modelo', 'nombre', 'item']) || '';
-                    const detail = String(rawDetail).trim();
+                    // Intenta obtener por claves candidatas, si falla asigna la primera columna
+                    let serie = extractValue(row, ['serie', 'imei', 'iccid', 'codigo', 'sn', 'serial', 'identificador']);
+                    if (!serie) {
+                        const vals = Object.values(row);
+                        if (vals.length > 0 && vals[0] !== null && vals[0] !== undefined) {
+                            serie = String(vals[0]).trim();
+                        }
+                    }
                     
-                    if (serie && !db[target].some(i => i.serie === serie)) {
-                        db[target].push({
-                            serie: serie,
-                            detail: detail,
-                            status: 'Disponible',
-                            assignedOrder: null,
-                            date: new Date().toLocaleDateString('es-EC')
-                        });
-                        addedCount++;
+                    let detail = extractValue(row, ['descripcion', 'detalle', 'modelo', 'nombre', 'item', 'articulo', 'producto']);
+                    if (!detail && Object.values(row).length > 1) {
+                        detail = String(Object.values(row)[1]).trim();
+                    }
+                    
+                    if (serie && serie !== "") {
+                        if (!db[target]) db[target] = [];
+                        if (!db[target].some(i => i.serie === serie)) {
+                            db[target].push({
+                                serie: serie,
+                                detail: detail || 'Carga Masiva Excel',
+                                status: 'Disponible',
+                                assignedOrder: null,
+                                date: new Date().toLocaleDateString('es-EC')
+                            });
+                            addedCount++;
+                        }
                     }
                 });
             }
@@ -1096,9 +1095,10 @@
             pendingImportData = null;
             document.getElementById('excel-file-input').value = '';
             
-            logAuditEvent('Carga Masiva', `Importados ${addedCount} registros en target: ${target}`);
-            showToast(`¡Carga completada! Se importaron ${addedCount} registros.`, 'success');
+            logAuditEvent('Carga Masiva', `Importados ${addedCount} registros en categoría: ${target}`);
+            showToast(`¡Carga completada! Se procesaron ${addedCount} registros correctamente.`, addedCount > 0 ? 'success' : 'warning');
         }
+
         // --- Core UI & Navigation Functions ---
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
